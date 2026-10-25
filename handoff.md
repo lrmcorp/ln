@@ -30,7 +30,7 @@ npm run build
 npm run dev
 ```
 
-`.env.local` is ignored and contains locally generated demo credentials. `npm run env:init` preserves an existing file. Never print or commit it. The cloud environment draft has saved installation and startup instructions; a saved draft is not publication. Check environment settings and publish status separately.
+`.env.local` is ignored and contains locally generated demo credentials. `npm run env:init` preserves an existing file. Never print or commit it. The cloud environment draft has saved installation and startup instructions. Its startup instruction begins by reading this handoff. A saved draft is not publication; check environment settings and publish status separately.
 
 The demo signature and bank actions require `ENABLE_DEMO_ADAPTERS=true`. The UI labels them as simulations. Production use needs verified providers and the missing controls listed in `docs/phase1.md`.
 
@@ -88,3 +88,4 @@ Owner MFA and high-assurance actions, customer-direct activation with separate c
 
 - **2026-10-25:** Moved the register ahead of long forms, added current-focus and per-case next-action labels, and kept existing controls. Added borrower-to-application selection and anchored reloads. Changed all forms to native POST and rotated the synthetic officer password after a pre-hydration GET exposed it in a URL. Validated the database suite, build, rendered Hallmark sweep, and phone browser workflow. Wired Caveman CLI token-saving modules for future local Codex sessions; local shrink still passed through.
 - **2026-10-25:** Added the read-first handoff rule to `AGENTS.md`. Rebuilt the production app, reran the rendered design sweep with 0 failures and 0 warnings, and verified 12 role-specific navigation and sign-out interactions.
+- **2026-10-25:** Updated the saved cloud startup instruction to read this handoff before repository changes. This draft still needs review and publication in environment settings.
