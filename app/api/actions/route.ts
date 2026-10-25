@@ -4,6 +4,34 @@ import {currentActor} from '@/lib/auth';
 import {perform} from '@/lib/workflow';
 
 const uuid=z.uuid();
+const errors:Record<string,string>={
+  'Application not found':'Pengajuan tidak ditemukan',
+  Forbidden:'Anda tidak memiliki izin untuk tindakan ini',
+  'Invalid policy limits':'Batas kebijakan tidak valid',
+  'Invalid borrower details':'Data nasabah tidak valid',
+  'Customer outside assigned branch':'Nasabah berada di luar cabang Anda',
+  'No active policy':'Belum ada kebijakan aktif',
+  'Outside policy limits':'Jumlah atau tenor di luar batas kebijakan',
+  'Unassigned application':'Pengajuan ini tidak ditugaskan kepada Anda',
+  'Unrelated application':'Pengajuan ini bukan milik Anda',
+  'Approval not allowed':'Pengajuan ini tidak dapat disetujui',
+  'Agreement is not available for signing':'Perjanjian belum tersedia untuk ditandatangani',
+  'A verified signature provider is required':'Layanan tanda tangan terverifikasi diperlukan',
+  'Agreement hash mismatch':'Data perjanjian tidak cocok',
+  'Signed agreement required':'Perjanjian yang telah ditandatangani diperlukan',
+  'Release authorization required':'Izin pencairan diperlukan',
+  'Invalid idempotency key':'Kunci transaksi tidak valid',
+  'Transfer not initiated':'Transfer belum dimulai',
+  'Numeric bank reference and independent settlement proof required':'Referensi bank berupa angka dan bukti penyelesaian diperlukan',
+  'A verified bank reconciliation adapter is required':'Layanan rekonsiliasi bank terverifikasi diperlukan',
+  'Loan is not active':'Pinjaman belum aktif',
+  'Invalid payment':'Data pembayaran tidak valid',
+  'Overpayment requires review':'Pembayaran melebihi tagihan dan perlu ditinjau',
+  'Ledger obligations must be paid off':'Seluruh kewajiban pembukuan harus lunas',
+  'Invalid financial inputs':'Data keuangan tidak valid',
+  'Amount exceeds safe range':'Jumlah melebihi batas yang didukung',
+  'Unbalanced journal':'Catatan pembukuan tidak seimbang'
+};
 const schema=z.discriminatedUnion('type',[
   z.object({type:z.literal('policy'),minPrincipal:z.number().int(),maxPrincipal:z.number().int(),flatInterestBps:z.number().int(),minWeeks:z.number().int(),maxWeeks:z.number().int()}),
   z.object({type:z.literal('customer'),name:z.string().min(1).max(200),nik:z.string().regex(/^[0-9]{16}$/),phone:z.string().min(8).max(20),bankName:z.string().min(1).max(100),accountNumber:z.string().regex(/^[0-9]{5,30}$/)}),
@@ -19,15 +47,15 @@ const schema=z.discriminatedUnion('type',[
 export async function POST(request:Request){
   try {
     const origin=request.headers.get('origin');
-    if(origin && new URL(origin).host!==request.headers.get('host')) return NextResponse.json({error:'Cross-origin request rejected'},{status:403});
+    if(origin && new URL(origin).host!==request.headers.get('host')) return NextResponse.json({error:'Permintaan dari asal berbeda ditolak'},{status:403});
     const actor=await currentActor();
-    if(!actor) return NextResponse.json({error:'Sign in required'},{status:401});
+    if(!actor) return NextResponse.json({error:'Silakan masuk terlebih dahulu'},{status:401});
     const action=schema.parse(await request.json());
     const result=await perform(actor,action);
     return NextResponse.json(result);
   }catch(error){
-    const message=error instanceof Error?error.message:'Request failed';
+    const message=error instanceof Error?error.message:'Permintaan gagal';
     const conflict=/duplicate key|unique constraint/i.test(message);
-    return NextResponse.json({error:conflict?'Duplicate reference or repeated operation':message},{status:conflict?409:400});
+    return NextResponse.json({error:conflict?'Referensi sudah digunakan atau tindakan telah dilakukan':error instanceof z.ZodError?'Data yang dikirim tidak valid':errors[message]??'Permintaan gagal. Silakan coba lagi.'},{status:conflict?409:400});
   }
 }

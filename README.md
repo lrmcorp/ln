@@ -1,15 +1,15 @@
-# LN Operations
+# LN Operasional
 
-This repository contains the first working Phase 1 increment for an Indonesian loan operations platform. It is a **development demonstration**, not a system for real customer data, legal electronic signatures, or bank transfers.
+Repositori ini berisi tahap pertama demo platform pengelolaan pinjaman. Aplikasi ini **hanya untuk pengembangan**, bukan untuk data nasabah sungguhan, tanda tangan elektronik yang sah, atau transfer dana nyata.
 
-## Run locally
+## Jalankan secara lokal
 
-Requires Node 24+, npm, and Docker Compose.
+Memerlukan Node.js 24 atau lebih baru, npm, dan Docker Compose.
 
 ```bash
 npm ci
 npm run env:init
-# The generated demo passwords remain only in .env.local.
+# Kata sandi demo yang dibuat hanya disimpan di .env.local.
 docker compose up -d --wait
 npm run db:migrate
 npm run db:seed
@@ -18,22 +18,32 @@ npm run build
 npm run dev
 ```
 
-Open the app on the local port shown by Next.js. Demo identities are `owner@local.test`, `officer@local.test`, and `customer@local.test`; use the corresponding passwords in your local `.env.local`. The seeded borrower belongs to the customer identity. Use only synthetic borrower and bank details.
+Buka aplikasi pada port lokal yang ditampilkan Next.js. Akun demo adalah `owner@local.test`, `officer@local.test`, dan `customer@local.test`. Gunakan kata sandi masing-masing dari `.env.local`. Nasabah contoh terhubung ke akun `customer@local.test`. Gunakan hanya data nasabah dan bank rekaan.
 
-The checked-in `.env.example` contains placeholders. Never commit `.env.local`. The demo adapter flag enables simulated signature and bank confirmation. Without it, those actions refuse to proceed until real, verified providers are integrated.
+`.env.example` berisi contoh konfigurasi. Jangan unggah `.env.local` ke Git. Pengaturan adaptor demo mengaktifkan simulasi tanda tangan dan konfirmasi bank. Tanpanya, kedua tindakan tersebut ditolak sampai layanan terverifikasi tersedia.
 
-## Current workflow
+## Alur saat ini
 
-The field officer creates a borrower and submits an application. The owner approves under the current versioned policy. The demo customer reviews the approved schedule and simulates signing. The owner authorizes release, initiates a transfer, records simulated independent settlement evidence, verifies payments, and closes the paid-off loan. Each state-changing action runs in a database transaction and writes an audit event. Disbursement and payment create balanced ledger journals.
+Petugas menambahkan nasabah dan mengajukan pinjaman. Pemilik menyetujui pengajuan menurut versi kebijakan yang berlaku. Nasabah demo meninjau jadwal lalu menyimulasikan tanda tangan. Pemilik mengizinkan pencairan, memulai transfer, mencatat bukti penyelesaian demo, memverifikasi pembayaran, dan menutup pinjaman lunas. Setiap perubahan status dilakukan dalam transaksi basis data dan dicatat untuk audit. Pencairan dan pembayaran menghasilkan jurnal yang seimbang.
 
-The owner sees ledger-backed principal and interest receivables, approval counts, and the case register. Staff and customer read access is scoped to their assignment or customer identity. The interface is responsive and works without an external provider account.
+Pemilik melihat saldo pokok dan bunga dari pembukuan, jumlah pengajuan, serta daftar pinjaman. Petugas dan nasabah hanya dapat melihat data sesuai penugasan atau identitas masing-masing. Antarmuka mendukung layar ponsel dan tidak memerlukan akun penyedia layanan eksternal.
 
-## Documentation
+## Pratinjau tampilan
 
-- [Handoff for future agents](handoff.md)
-- [Architecture, data model, rules, and journeys](docs/phase1.md)
-- [API and deployment runbook](docs/runbook.md)
+- [Desktop pemilik](docs/previews/desktop-pemilik.png)
+- [Ponsel pemilik](docs/previews/mobile-pemilik.png)
+- [Ponsel petugas](docs/previews/mobile-petugas.png)
+- [Ponsel nasabah](docs/previews/mobile-nasabah.png)
+- [Detail pinjaman nasabah](docs/previews/mobile-nasabah-detail.png)
 
-## Honest boundary
+Gambar diambil dari aplikasi lokal dengan data demo sintetis pada 25 Oktober 2026. Isi data demo dapat berubah setelah pengujian berikutnya.
 
-This increment covers one synthetic happy path and several critical failure paths. It does not implement identity document upload, identity verification, customer-direct activation codes, owner MFA, a legal signing provider, bank integration, encrypted sensitive field storage, Redis rate limiting, location consent, refunds or reversals, background jobs, backups, or Flutter clients. The controls in the prompt that depend on those capabilities remain release blockers. See the staged plan and acceptance matrix in `docs/phase1.md`.
+## Dokumentasi
+
+- [Catatan serah terima untuk agen berikutnya](handoff.md)
+- [Arsitektur, model data, aturan, dan alur](docs/phase1.md)
+- [API dan panduan menjalankan sistem](docs/runbook.md)
+
+## Batas demo
+
+Tahap ini mencakup satu alur demo dan sejumlah kegagalan penting. Unggah dan verifikasi dokumen identitas, aktivasi langsung nasabah, MFA pemilik, penyedia tanda tangan sah, integrasi bank, enkripsi kolom sensitif, pembatasan permintaan dengan Redis, persetujuan lokasi, pengembalian dana, proses latar, cadangan data, dan aplikasi Flutter belum tersedia. Semua itu masih menjadi syarat sebelum penggunaan nyata. Lihat rencana dan matriks penerimaan di `docs/phase1.md`.
