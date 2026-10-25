@@ -32,6 +32,8 @@ npm run dev
 
 `.env.local` is ignored and contains locally generated demo credentials. `npm run env:init` preserves an existing file. Never print or commit it. The cloud environment draft has saved installation and startup instructions. Its startup instruction begins by reading this handoff. A saved draft is not publication; check environment settings and publish status separately.
 
+GitHub sync is pending for the Indonesian UI and preview images. The change is committed locally as `6ddf392`, but `git push origin main` failed because the injected `GH_TOKEN` was rejected by GitHub. Do not claim these images or translations are on GitHub until a push succeeds. Do not print or copy the token into commands or files.
+
 The demo signature and bank actions require `ENABLE_DEMO_ADAPTERS=true`. The UI labels them as simulations. Production use needs verified providers and the missing controls listed in `docs/phase1.md`.
 
 ## UI and design decisions
@@ -93,3 +95,4 @@ Owner MFA and high-assurance actions, customer-direct activation with separate c
 - **2026-10-25:** Added the read-first handoff rule to `AGENTS.md`. Rebuilt the production app, reran the rendered design sweep with 0 failures and 0 warnings, and verified 12 role-specific navigation and sign-out interactions.
 - **2026-10-25:** Updated the saved cloud startup instruction to read this handoff before repository changes. This draft still needs review and publication in environment settings.
 - **2026-10-25:** Translated the user-facing interface, role/status/action labels, metadata, and API errors into Indonesian. Rewrote the README in Indonesian and added desktop/phone captures, including customer phone and approved-loan detail. Verified 5 tests, production build, rendered Hallmark sweep, and 320px/390px browser layouts. One synthetic approved application was added to the local demo database to show the customer action; the screenshots capture that state.
+- **2026-10-25:** Attempted to publish the Indonesian update to GitHub. The push failed because the environment's `GH_TOKEN` was invalid. The files and preview images remain committed locally; GitHub publication is pending credential repair.
