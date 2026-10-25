@@ -1,0 +1,112 @@
+# Product and technical design
+
+## Architecture and module map
+
+The current code is a modular TypeScript monolith: Next.js renders responsive screens and exposes route handlers; `lib/workflow.ts` owns state transitions and transaction boundaries; `lib/finance.ts` owns integer IDR calculations; PostgreSQL holds records, journals, and audit events. Future Flutter clients can use the same API after its contract is versioned. External services belong behind identity, signature, bank, and messaging adapters. The two current demo adapters deliberately refuse to run unless `ENABLE_DEMO_ADAPTERS=true`.
+
+```mermaid
+flowchart LR
+  W[Owner, officer, customer web] --> API[Next.js API]
+  API --> Auth[Identity and role checks]
+  API --> Workflow[Loan workflow]
+  Workflow --> Finance[Pricing and allocation]
+  Workflow --> PG[(PostgreSQL)]
+  Workflow -. future .-> Providers[Signature, bank, messaging adapters]
+  Flutter[Later Flutter apps] -. same API .-> API
+```
+
+Planned module boundaries: identity and branches; customers and verification; products and policy; applications and approval; agreements and activation; disbursement; schedules and repayment; ledger and audit; reporting; consent and notifications. No real provider is selected.
+
+## Data model and ERD
+
+Amounts are integer IDR. Timestamps are stored in UTC; user-facing dates use `Asia/Jakarta`. Policy and agreement snapshots preserve the approved economics.
+
+```mermaid
+erDiagram
+  BRANCHES ||--o{ USERS : contains
+  BRANCHES ||--o{ CUSTOMERS : serves
+  CUSTOMERS ||--o{ APPLICATIONS : requests
+  USERS ||--o{ APPLICATIONS : originates
+  POLICY_VERSIONS ||--o{ APPLICATIONS : prices
+  APPLICATIONS ||--o{ AGREEMENTS : versions
+  APPLICATIONS ||--o{ INSTALLMENTS : schedules
+  APPLICATIONS ||--o| DISBURSEMENTS : funds
+  APPLICATIONS ||--o{ PAYMENTS : receives
+  APPLICATIONS ||--o{ JOURNALS : records
+  JOURNALS ||--o{ JOURNAL_LINES : balances
+  USERS ||--o{ AUDIT_EVENTS : acts
+```
+
+The schema is in `db/schema.sql`. Customer NIK is reduced to a keyed duplicate-detection hash and last four digits; full account numbers are not retained in this demo. A production implementation needs independent encryption keys, verified identity evidence, secure object storage, and retention policies.
+
+## Permission matrix
+
+| Operation | Owner | Assigned officer | Related customer |
+| --- | --- | --- | --- |
+| Create borrower and submit application | No | Yes, own branch | No |
+| View case | All | Own originated cases | Own case |
+| Create policy version | Yes | No | No |
+| Approve application | Yes | No | No |
+| Simulate signature | No | No | Yes |
+| Authorize, initiate, confirm transfer | Yes | No | No |
+| Verify repayment and close | Yes | No | No |
+
+The API enforces this matrix. The owner role is not yet protected by MFA or high-assurance step-up, so it is a development role only.
+
+## State transitions
+
+```mermaid
+stateDiagram-v2
+  [*] --> submitted
+  submitted --> approved: owner approves
+  approved --> signed: customer demo signature
+  signed --> release_authorized: owner authorizes
+  release_authorized --> transfer_initiated: owner initiates
+  transfer_initiated --> active: demo settlement evidence
+  active --> paid_off: ledger obligations reach zero
+  paid_off --> closed: owner closes
+```
+
+No receivable exists at approval or signing. The disbursement journal is created only when the demo bank confirmation action marks the loan active. A production system must require independent settlement evidence from a trusted bank or an authorized manual review workflow.
+
+## Calculation specification
+
+- Policy versions hold min/max principal, flat term interest basis points, and term bounds. The seeded 200 basis points is a **demo value**, not a recommended rate.
+- Interest in IDR is `round_half_up(principal × basis_points / 10,000)` using `BigInt` before conversion to a safe JavaScript integer.
+- Principal and interest are split across weekly installments; remainders are assigned to the earliest installments. The totals always equal the approved snapshot.
+- Payment allocation applies to interest receivable first, then principal. Overpayments stop for review. Partial payment and duplicate bank references are supported or rejected respectively.
+- Disbursement journals debit principal receivable and interest receivable, credit cash and interest income. Payment journals debit cash and credit the two receivables. Each journal is checked for balance. This prototype recognizes all flat interest at disbursement; production accounting policy needs review.
+- Schedule dates derive from the Jakarta calendar date. Existing agreement snapshots do not change when a new policy version is created.
+
+## Screens and journeys
+
+| Screen | Job | Current state |
+| --- | --- | --- |
+| Sign in | Enter role-specific local workspace | Working demo session |
+| Owner overview | Review receivables, pending and active cases | Working, ledger-backed amounts |
+| Loan register | Inspect status, approved schedule, collections | Working |
+| Borrower intake | Capture synthetic identity and bank summary | Working subset; no evidence upload |
+| Officer application | Submit an amount and term | Working subset |
+| Owner policy | Create new policy version | Working subset |
+| Owner decision and transfer | Approve, release, initiate, confirm | Working with demo settlement |
+| Customer case | Review schedule and simulate signature | Working demo adapter |
+| Payment and closure | Verify partial/full payment, close case | Working |
+
+Staff journey: create borrower, submit case, track status. Owner journey: review case and economics, approve, monitor signature, authorize and reconcile transfer, verify payments, close. Customer journey: sign in with demo credentials, view terms, simulate signature, view payments and closure. The later customer-direct activation and legal signing journey is not implemented.
+
+## Acceptance matrix and milestones
+
+| Gate | Evidence now | Release status |
+| --- | --- | --- |
+| Arithmetic, schedule, payment allocation | Unit tests | Demo verified |
+| Role restrictions and scoped reads | Transaction test and API checks | Demo verified; MFA still required |
+| Signature version/hash match | Canonical hash check in workflow test | Demo verified; legal provider missing |
+| Disbursement idempotency | Replay test | Demo verified |
+| Transfer reconciliation | Demo evidence note only | Blocked for real money |
+| Balanced journals and zero-balance closure | Integration test | Demo verified |
+| Activation codes, PIN, rate limits, device recovery | Not implemented | Blocked |
+| KTP verification, OCR, consent and protected files | Not implemented | Blocked |
+| Reversals, refunds, write-offs, rescheduling | Not implemented | Blocked |
+| Backup restoration, operational security review | Not run | Blocked |
+
+Milestone 1 is this local vertical slice. Milestone 2 should add real identity and customer-direct activation with encrypted storage, rate limits, MFA, and document handling. Milestone 3 should integrate legal signing and bank settlement with independent reconciliation and reversals. Milestone 4 should complete collections, reports, consent, backup restore exercises, and operational review. Flutter phases follow the stable API and shared domain rules.

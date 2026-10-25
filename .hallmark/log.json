@@ -1,0 +1,27 @@
+[
+ {
+  "scope": "app",
+  "mode": "redesign",
+  "depth": "full",
+  "shape": "operational register",
+  "theme": "custom",
+  "axes": "calm utilitarian",
+  "hero": "none",
+  "nav": "focused links",
+  "footer": "none",
+  "imagery": "none",
+  "photos": [],
+  "sections": [
+   "focus",
+   "register",
+   "metrics",
+   "forms"
+  ],
+  "signature": "next action above the ledger",
+  "waived": [
+   "24b"
+  ],
+  "prompt": "mobile loan operations with one to three steps",
+  "date": "2026-10-25"
+ }
+]
