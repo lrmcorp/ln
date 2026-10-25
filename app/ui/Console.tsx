@@ -1,19 +1,18 @@
 'use client';
 import {useEffect,useState,useTransition} from 'react';
 
-type Actor={id:string;name:string;email:string;role:'owner'|'officer'|'customer'};
+type Actor={id:string;name:string;email:string;role:'owner'|'officer'};
 type Application={id:string;status:string;requested_principal:string;approved_principal:string|null;interest_amount:string|null;term_weeks:number;customer_name:string;officer_name:string;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;paid:string;transfer_reference:string|null};
 type Data={applications:Application[];customers:{id:string;name:string}[];totals:{net_cash:string;principal_outstanding:string;interest_receivable:string}|null;policy:{version:number;min_principal:string;max_principal:string;flat_interest_bps:number;min_weeks:number;max_weeks:number}|null;counts:{pending:number;active:number}|null};
 const money=(value:string|number|null|undefined)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(value??0));
 const labels:Record<string,string>={submitted:'Menunggu keputusan',approved:'Disetujui',signed:'Perjanjian ditandatangani',release_authorized:'Pencairan diizinkan',transfer_initiated:'Transfer dimulai',active:'Aktif',paid_off:'Lunas',closed:'Ditutup'};
 const ownerSteps:Record<string,string>={submitted:'Putuskan pengajuan',signed:'Izinkan pencairan',release_authorized:'Mulai transfer',transfer_initiated:'Konfirmasi transfer',active:'Catat pembayaran',paid_off:'Tutup pinjaman'};
-const roleLabels:Record<Actor['role'],string>={owner:'Pemilik',officer:'Petugas',customer:'Nasabah'};
+const roleLabels:Record<Actor['role'],string>={owner:'Pemilik',officer:'Petugas'};
 const demoNames:Record<string,string>={'Demo Owner':'Pemilik Demo','Demo Officer':'Petugas Demo','Demo Borrower':'Nasabah Demo'};
 const displayName=(name:string)=>demoNames[name]??name;
 function nextStep(role:Actor['role'],status:string){
   if(status==='closed') return 'Pinjaman ditutup';
   if(role==='owner') return ownerSteps[status]??'Tinjau pinjaman';
-  if(role==='customer'&&status==='approved') return 'Tinjau perjanjian';
   return 'Lihat perkembangan';
 }
 
@@ -54,15 +53,13 @@ export default function Console({actor,initial}:{actor:Actor|null;initial:Data|n
   const counts=initial?.counts??{pending:apps.filter(a=>a.status==='submitted').length,active:apps.filter(a=>a.status==='active').length};
   const priority=(status:string)=>actor.role==='owner'?(ownerSteps[status]?0:status==='closed'?2:1):status==='closed'?2:0;
   const orderedApps=[...apps].sort((a,b)=>priority(a.status)-priority(b.status));
-  const lead=orderedApps[0];
   const ownerAction=orderedApps.find(app=>ownerSteps[app.status]);
   const openOfficerCases=apps.filter(app=>app.status!=='closed').length;
   const focus=actor.role==='owner'?(counts.pending?`${counts.pending} pengajuan menunggu keputusan`:ownerAction?`Langkah berikutnya: ${nextStep(actor.role,ownerAction.status)}`:'Tidak ada tindakan tertunda'):
-    actor.role==='officer'?(openOfficerCases?`${openOfficerCases} pinjaman masih berjalan`:'Tidak ada pinjaman aktif'):
-    lead?`${displayName(lead.customer_name)}: ${labels[lead.status]??lead.status}`:'Belum ada pinjaman';
+    openOfficerCases?`${openOfficerCases} pinjaman masih berjalan`:'Tidak ada pinjaman aktif';
   return <main className="shell" id="top"><header className="mast"><div className="brand">LN <span>Operasional</span></div><div className="identity"><span>{displayName(actor.name)}<small>{roleLabels[actor.role]}</small></span><button className="textButton" onClick={()=>post('/api/logout',{})}>Keluar</button></div></header>
-    <div className="workspace"><aside className="rail"><span className="railTitle">Ruang kerja</span><a className="overviewLink" href="#overview">Ringkasan</a><a href="#register">Daftar pinjaman</a>{actor.role==='officer'&&<><a href="#new">Ajukan pinjaman</a><a href="#borrower">Tambah nasabah</a></>}{actor.role==='owner'&&<a href="#settings">Kebijakan pinjaman</a>}<div className="railFoot">Hanya untuk pengembangan<br/>Layanan penyedia disimulasikan</div></aside>
-      <div className="content" id="overview"><div className="intro"><div><h1>{actor.role==='owner'?'Ringkasan portofolio':actor.role==='officer'?'Pinjaman Anda':'Pinjaman saya'}</h1><p>{actor.role==='owner'?'Tinjau keputusan, transfer, dan saldo pembukuan.':actor.role==='officer'?'Pantau pinjaman dan ajukan yang berikutnya.':'Tinjau ketentuan dan status pembayaran Anda.'}</p></div><span className="date">{new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'full'}).format(new Date())}</span></div>
+    <div className="workspace"><aside className="rail"><span className="railTitle">Ruang kerja</span><a className="overviewLink" href="#overview">Ringkasan</a><a href="#register">Daftar pinjaman</a>{actor.role==='officer'&&<><a href="#new">Ajukan pinjaman</a><a href="#borrower">Tambah nasabah</a></>}{actor.role==='owner'&&<><a href="/lokasi">Lokasi nasabah</a><a href="#settings">Kebijakan pinjaman</a></>}<div className="railFoot">Hanya untuk pengembangan<br/>Layanan penyedia disimulasikan</div></aside>
+      <div className="content" id="overview"><div className="intro"><div><h1>{actor.role==='owner'?'Ringkasan portofolio':'Pinjaman Anda'}</h1><p>{actor.role==='owner'?'Tinjau keputusan, transfer, dan saldo pembukuan.':'Pantau pinjaman dan ajukan yang berikutnya.'}</p></div><span className="date">{new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'full'}).format(new Date())}</span></div>
       <section className="focusPanel" aria-label="Fokus saat ini"><div><small>Fokus saat ini</small><strong>{focus}</strong></div><a href={actor.role==='officer'?'#new':'#register'}>{actor.role==='officer'?'Ajukan pinjaman':'Lihat pinjaman'}</a></section>
       <section id="register" className="register"><div className="sectionHead"><div><h2>Daftar pinjaman</h2><p>{apps.length} pinjaman dapat Anda lihat</p></div></div>
         {apps.length===0?<div className="empty">Belum ada pinjaman. {actor.role==='officer'?'Tambahkan nasabah atau ajukan pinjaman di bawah.':'Pinjaman akan muncul di sini setelah diajukan.'}</div>:<div className="caseList">{orderedApps.map(app=><Case key={app.id} app={app} role={actor.role} pending={pending} post={post}/>)}</div>}
@@ -82,7 +79,6 @@ function Case({app,role,pending,post}:{app:Application;role:Actor['role'];pendin
     {open&&<div className="caseBody" id={`case-${app.id}`}><div className="facts"><div><small>Tenor</small><strong>{app.term_weeks} minggu</strong></div><div><small>Total tagihan</small><strong>{app.approved_principal?money(total):'Menunggu keputusan'}</strong></div><div><small>Sudah dibayar</small><strong>{money(app.paid)}</strong></div><div><small>Referensi transfer</small><strong>{app.transfer_reference??'Belum dikonfirmasi'}</strong></div></div>
       {app.snapshot&&<details><summary>Jadwal dan ketentuan yang disetujui</summary><div className="schedule"><p>Bunga tetap: {Number(app.snapshot.rateBps)/100}% untuk seluruh tenor. Kebijakan versi {app.snapshot.policyVersion}. Hash perjanjian demo: {app.snapshot_hash?.slice(0,16)}…</p><table><thead><tr><th>Angsuran</th><th>Jatuh tempo</th><th>Pokok</th><th>Bunga</th></tr></thead><tbody>{app.snapshot.schedule.map((i:any)=><tr key={i.sequence}><td>{i.sequence}</td><td>{new Date(`${i.dueAt}T12:00:00Z`).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</td><td>{money(i.principal)}</td><td>{money(i.interest)}</td></tr>)}</tbody></table></div></details>}
       <div className="actions">{role==='owner'&&app.status==='submitted'&&<button disabled={pending} onClick={()=>post('/api/actions',{type:'approve',applicationId:app.id})}>Setujui pengajuan</button>}
-        {role==='customer'&&app.status==='approved'&&<div className="actionGroup"><p>Hanya simulasi tanda tangan. Tindakan ini tidak menghasilkan perjanjian yang sah secara hukum.</p><button disabled={pending} onClick={()=>post('/api/actions',{type:'sign',applicationId:app.id})}>Simulasikan tanda tangan</button></div>}
         {role==='owner'&&app.status==='signed'&&<button disabled={pending} onClick={()=>post('/api/actions',{type:'authorize',applicationId:app.id})}>Izinkan pencairan</button>}
         {role==='owner'&&app.status==='release_authorized'&&<button disabled={pending} onClick={()=>post('/api/actions',{type:'initiate',applicationId:app.id,idempotencyKey:`demo-${app.id}`})}>Mulai transfer</button>}
         {role==='owner'&&app.status==='transfer_initiated'&&<form method="post" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);post('/api/actions',{type:'confirm',applicationId:app.id,bankReference:f.get('bankReference'),proof:f.get('proof')});}}><p>Simulasi layanan bank. Masukkan referensi angka dan catatan bukti penyelesaian.</p><label>Referensi bank<input name="bankReference" inputMode="numeric" pattern="[0-9]+" required/></label><label>Catatan bukti<input name="proof" required/></label><button disabled={pending}>Konfirmasi transfer demo</button></form>}

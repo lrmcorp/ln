@@ -2,7 +2,7 @@ import {createHmac, randomBytes, scryptSync, timingSafeEqual} from 'node:crypto'
 import {cookies} from 'next/headers';
 import {pool} from './db';
 
-export type Actor={id:string;name:string;email:string;role:'owner'|'officer'|'customer';branch_id:string|null;customer_id:string|null};
+export type Actor={id:string;name:string;email:string;role:'owner'|'manager'|'officer'|'customer';branch_id:string|null;customer_id:string|null};
 const secret=process.env.SESSION_SECRET;
 if (!secret || secret.length<32) throw new Error('SESSION_SECRET must be at least 32 characters');
 export function hashPassword(password:string, salt=randomBytes(16).toString('hex')) {

@@ -20,3 +20,40 @@ h1,h2{text-wrap:balance}
 .newPanel{scroll-margin-top:20px}
 .metrics{margin-bottom:54px}
 @media(max-width:620px){.rail{gap:0;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap}.rail .overviewLink{display:none}.rail a{display:inline-flex;align-items:center;min-height:44px;padding:8px 12px}.intro{margin-bottom:22px}.intro h1{font-size:2.2rem}.intro p{font-size:.92rem}.date{display:none}.focusPanel{padding:20px;display:block;margin-bottom:30px}.focusPanel strong{font-size:1.35rem}.focusPanel a{margin-top:12px}.register{margin-bottom:38px}.caseTop{display:flex;align-items:flex-start}.caseTop h3{font-size:1.35rem}.caseTop p{font-size:.78rem}.caseAmount{margin-top:0;align-items:flex-end;flex-shrink:0}.caseAmount strong{font-size:.95rem}.loginGrid{padding-top:30px;gap:26px}.loginGrid h1{font-size:2.15rem}.demoNotice{margin-top:20px}.loginForm{padding:24px}}
+.locationApp{min-height:100dvh;max-width:860px;margin:auto;padding:20px 24px 70px}
+.locationHeader{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px 22px}
+.locationHeader .textButton{min-height:44px}
+.locationContent{max-width:690px;margin:52px auto 0}
+.locationIntro{margin-bottom:34px}
+.locationIntro small{color:var(--accent);font-weight:700}
+.locationIntro h1{margin:14px 0 10px}
+.locationIntro p{margin:0}
+.locationPrimary{background:var(--ink);color:var(--surface);padding:30px;border-radius:14px;margin-bottom:18px}
+.locationPrimary small{color:var(--surface)}
+.locationPrimary h2{font-size:clamp(1.8rem,4vw,2.5rem);margin:12px 0}
+.locationPrimary p{color:var(--surface);max-width:520px}
+.locationPrimary button:not(.textButton){background:var(--surface);color:var(--ink);min-height:48px}
+.locationPrimary button:not(.textButton):disabled{background:var(--soft);color:var(--muted);cursor:wait}
+.locationDetails{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:30px}
+.locationDetails>div{background:var(--surface);padding:22px;min-width:0}
+.locationDetails small{display:block;color:var(--muted);margin-bottom:8px}
+.locationDetails strong{font-weight:600;overflow-wrap:anywhere}
+.locationPrivacy{border-top:1px solid var(--line);padding-top:25px}
+.locationPrivacy h2{font-size:1.6rem;margin-bottom:12px}
+.locationPrivacy p{font-size:.9rem}
+.locationMessage{background:var(--soft);padding:14px 18px;border-radius:8px}
+.monitorContent{max-width:1000px;margin:56px auto;padding:0 28px 70px}
+.monitorBack{display:inline-block;color:var(--accent);text-underline-offset:4px;margin-bottom:30px}
+.monitorIntro{margin-bottom:32px}
+.monitorIntro h1{margin-bottom:12px}
+.monitorIntro p{max-width:670px}
+.monitorList{display:grid;gap:12px}
+.monitorCard{display:flex;justify-content:space-between;gap:24px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px}
+.monitorCard small{color:var(--accent);font-weight:700}
+.monitorCard h2{font-size:1.65rem;margin:8px 0}
+.monitorCard p{font-size:.85rem;margin:0}
+.monitorCoordinates{text-align:right;min-width:0}
+.monitorCoordinates strong{display:block;overflow-wrap:anywhere}
+.monitorCoordinates span{display:block;color:var(--muted);font-size:.8rem;margin-top:5px}
+.monitorNote{font-size:.85rem;margin-top:26px}
+@media(max-width:620px){.locationApp{padding:10px 12px 40px}.locationHeader{padding:12px 16px}.locationContent{margin-top:34px}.locationIntro{margin-bottom:24px}.locationIntro h1{font-size:2.4rem}.locationPrimary{padding:22px;margin-bottom:12px}.locationPrimary h2{font-size:1.9rem}.locationDetails>div{padding:16px}.locationDetails strong{font-size:.88rem}.monitorPage .mast{margin:10px}.monitorContent{margin:30px auto;padding:0 14px 40px}.monitorIntro h1{font-size:2.4rem}.monitorCard{display:block;padding:20px}.monitorCoordinates{text-align:left;margin-top:16px}.monitorCoordinates strong{font-size:.95rem}}

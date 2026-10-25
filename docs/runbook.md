@@ -9,6 +9,8 @@ All routes accept JSON. Authentication uses a signed, HTTP-only, same-site sessi
 | `POST /api/login` | `{email,password}` | Session cookie |
 | `POST /api/logout` | `{}` | Clears cookie |
 | `POST /api/actions` | Discriminated action object below | New ID, version, receipt or allocation |
+| `GET /api/location` | Session cookie | Own status for customer; scoped latest reports for owner/manager; officer denied |
+| `POST /api/location` | Customer `consent` or `report` JSON | Updates permission or latest rounded location |
 
 `/api/actions` supports:
 
@@ -21,6 +23,8 @@ All routes accept JSON. Authentication uses a signed, HTTP-only, same-site sessi
 - `payment`: `applicationId`, unique `bankReference`, integer IDR `amount` (owner).
 
 The server-rendered dashboard currently supplies reads. Before Flutter, add stable versioned read endpoints, pagination, idempotency contracts, and OpenAPI generation.
+
+Location reports are accepted only from the customer account while an active loan and separate location consent exist. The browser uses device geolocation while the customer page remains open and sends periodic updates. The server stores only the latest coordinates, rounded to three decimal places, with a minimum displayed accuracy of 150 meters. Withdrawal clears the location; payoff also stops sharing. The owner can see all active cases, a manager can see only their branch, and an officer gets HTTP 403. Every monitor read is audited. There is no configured geofence boundary, background collection, or live map. Treat updates as best effort and the 30-second freshness indicator as a signal, not a guarantee.
 
 ## Startup and validation
 
@@ -37,6 +41,6 @@ npm run build
 npm run start
 ```
 
-`npm run env:init` generates `.env.local` only when absent and never prints its secrets. `npm run db:seed` is repeatable and does not overwrite existing demo passwords. The migration is repeatable. Use `docker compose down` to stop the local database; avoid `-v` unless intentionally discarding test data.
+`npm run env:init` generates `.env.local` when absent or adds a missing manager demo password to an existing file; it never prints secrets or changes other credentials. `npm run db:seed` is repeatable and does not overwrite existing demo passwords. The migration is repeatable. Use `docker compose down` to stop the local database; avoid `-v` unless intentionally discarding test data.
 
 For a real deployment, replace demo adapters, set `ENABLE_DEMO_ADAPTERS` to false, provision managed PostgreSQL and Redis, use managed secrets and encryption keys, configure TLS, backups and restore drills, implement owner MFA and step-up, and complete the blocked acceptance gates in `phase1.md`. Do not deploy this increment for live lending.

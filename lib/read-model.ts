@@ -2,6 +2,7 @@ import {pool} from './db';
 import type {Actor} from './auth';
 
 export async function dashboard(actor:Actor){
+  if(actor.role==='manager') throw new Error('Forbidden');
   const scope=actor.role==='officer'?'WHERE a.officer_id=$1':actor.role==='customer'?'WHERE a.customer_id=$1':'';
   const params=actor.role==='officer'?[actor.id]:actor.role==='customer'?[actor.customer_id]:[];
   const [applications,customers,totals,policy,counts]=await Promise.all([

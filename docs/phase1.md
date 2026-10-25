@@ -2,11 +2,11 @@
 
 ## Architecture and module map
 
-The current code is a modular TypeScript monolith: Next.js renders responsive screens and exposes route handlers; `lib/workflow.ts` owns state transitions and transaction boundaries; `lib/finance.ts` owns integer IDR calculations; PostgreSQL holds records, journals, and audit events. Future Flutter clients can use the same API after its contract is versioned. External services belong behind identity, signature, bank, and messaging adapters. The two current demo adapters deliberately refuse to run unless `ENABLE_DEMO_ADAPTERS=true`.
+The current code is a modular TypeScript monolith: Next.js renders responsive screens and exposes route handlers; `lib/workflow.ts` owns state transitions and transaction boundaries; `lib/finance.ts` owns integer IDR calculations; `lib/location.ts` owns consent and latest-location access; PostgreSQL holds records, journals, and audit events. Future Flutter clients can use the same API after its contract is versioned. External services belong behind identity, signature, bank, and messaging adapters. The two current demo adapters deliberately refuse to run unless `ENABLE_DEMO_ADAPTERS=true`.
 
 ```mermaid
 flowchart LR
-  W[Owner, officer, customer web] --> API[Next.js API]
+  W[Owner, manager, officer, customer web] --> API[Next.js API]
   API --> Auth[Identity and role checks]
   API --> Workflow[Loan workflow]
   Workflow --> Finance[Pricing and allocation]
@@ -26,6 +26,7 @@ erDiagram
   BRANCHES ||--o{ USERS : contains
   BRANCHES ||--o{ CUSTOMERS : serves
   CUSTOMERS ||--o{ APPLICATIONS : requests
+  CUSTOMERS ||--o| LOCATION_SHARES : consents
   USERS ||--o{ APPLICATIONS : originates
   POLICY_VERSIONS ||--o{ APPLICATIONS : prices
   APPLICATIONS ||--o{ AGREEMENTS : versions
@@ -37,21 +38,23 @@ erDiagram
   USERS ||--o{ AUDIT_EVENTS : acts
 ```
 
-The schema is in `db/schema.sql`. Customer NIK is reduced to a keyed duplicate-detection hash and last four digits; full account numbers are not retained in this demo. A production implementation needs independent encryption keys, verified identity evidence, secure object storage, and retention policies.
+The schema is in `db/schema.sql`. Customer NIK is reduced to a keyed duplicate-detection hash and last four digits; full account numbers are not retained in this demo. `location_shares` keeps one rounded latest location per consenting customer, never a movement history. A production implementation needs independent encryption keys, verified identity evidence, secure object storage, location retention enforcement, and access controls.
 
 ## Permission matrix
 
-| Operation | Owner | Assigned officer | Related customer |
-| --- | --- | --- | --- |
-| Create borrower and submit application | No | Yes, own branch | No |
-| View case | All | Own originated cases | Own case |
-| Create policy version | Yes | No | No |
-| Approve application | Yes | No | No |
-| Simulate signature | No | No | Yes |
-| Authorize, initiate, confirm transfer | Yes | No | No |
-| Verify repayment and close | Yes | No | No |
+| Operation | Owner | Manager | Assigned officer | Customer |
+| --- | --- | --- | --- | --- |
+| Create borrower and submit application | No | No | Yes, own branch | No |
+| View case | All | No | Own originated cases | No customer case screen |
+| View latest consented location | All active cases | Active cases in own branch | No | Own status only |
+| Change location consent or report location | No | No | No | Own active case only |
+| Create policy version | Yes | No | No | No |
+| Approve application | Yes | No | No | No |
+| Simulate signature through internal API | No | No | No | Yes; no customer UI |
+| Authorize, initiate, confirm transfer | Yes | No | No | No |
+| Verify repayment and close | Yes | No | No | No |
 
-The API enforces this matrix. The owner role is not yet protected by MFA or high-assurance step-up, so it is a development role only.
+The API enforces this matrix. The manager role has branch-scoped location read access and no financial actions. The owner role is not yet protected by MFA or high-assurance step-up, so it is a development role only.
 
 ## State transitions
 
@@ -89,10 +92,11 @@ No receivable exists at approval or signing. The disbursement journal is created
 | Officer application | Submit an amount and term | Working subset |
 | Owner policy | Create new policy version | Working subset |
 | Owner decision and transfer | Approve, release, initiate, confirm | Working with demo settlement |
-| Customer case | Review schedule and simulate signature | Working demo adapter |
+| Customer location | Start/stop optional sharing, inspect permission and last report | Working foreground web demo |
+| Superadmin/manager location | View latest coarse location for active, consented cases | Working branch-scoped demo; no map or boundary |
 | Payment and closure | Verify partial/full payment, close case | Working |
 
-Staff journey: create borrower, submit case, track status. Owner journey: review case and economics, approve, monitor signature, authorize and reconcile transfer, verify payments, close. Customer journey: sign in with demo credentials, view terms, simulate signature, view payments and closure. The later customer-direct activation and legal signing journey is not implemented.
+Staff journey: create borrower, submit case, track status. Owner journey: review case and economics, approve, monitor signature, authorize and reconcile transfer, verify payments, close; a separate location view shows current consented reports. Manager journey: view only branch-scoped location reports. Customer web journey: sign in, choose whether to share location while an active case exists, and see permission and latest-report status. The customer web screen no longer exposes a loan dashboard or signing control per the latest user scope. The internal demo signing API remains for workflow tests until a separate signing channel is built.
 
 ## Acceptance matrix and milestones
 
@@ -103,6 +107,7 @@ Staff journey: create borrower, submit case, track status. Owner journey: review
 | Signature version/hash match | Canonical hash check in workflow test | Demo verified; legal provider missing |
 | Disbursement idempotency | Replay test | Demo verified |
 | Transfer reconciliation | Demo evidence note only | Blocked for real money |
+| Location consent and role separation | Integration and browser tests; rounded latest report only | Foreground demo verified; boundary and background tracking absent |
 | Balanced journals and zero-balance closure | Integration test | Demo verified |
 | Activation codes, PIN, rate limits, device recovery | Not implemented | Blocked |
 | KTP verification, OCR, consent and protected files | Not implemented | Blocked |

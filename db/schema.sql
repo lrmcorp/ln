@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS branches (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text UNIQUE NOT NULL);
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL, name text NOT NULL,
-  role text NOT NULL CHECK (role IN ('owner','officer','customer')),
+  role text NOT NULL CHECK (role IN ('owner','manager','officer','customer')),
   branch_id uuid REFERENCES branches(id), customer_id uuid,
   password_hash text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -16,6 +16,8 @@ DO $$ BEGIN
     ALTER TABLE users ADD CONSTRAINT users_customer_fk FOREIGN KEY (customer_id) REFERENCES customers(id);
   END IF;
 END $$;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('owner','manager','officer','customer'));
 CREATE TABLE IF NOT EXISTS policy_versions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), version integer UNIQUE NOT NULL,
   min_principal bigint NOT NULL, max_principal bigint NOT NULL,
@@ -68,6 +70,20 @@ CREATE TABLE IF NOT EXISTS audit_events (
   id bigserial PRIMARY KEY, actor_id uuid REFERENCES users(id), subject_type text NOT NULL,
   subject_id uuid NOT NULL, action text NOT NULL, before_data jsonb, after_data jsonb,
   reason text, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS location_shares (
+  customer_id uuid PRIMARY KEY REFERENCES customers(id),
+  enabled boolean NOT NULL DEFAULT false,
+  consented_at timestamptz,
+  stopped_at timestamptz,
+  latitude numeric(6,3),
+  longitude numeric(6,3),
+  accuracy_m integer,
+  reported_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+  CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
+  CHECK (accuracy_m IS NULL OR accuracy_m >= 0)
 );
 CREATE INDEX IF NOT EXISTS applications_officer_idx ON applications(officer_id,status);
 CREATE INDEX IF NOT EXISTS applications_branch_idx ON applications(branch_id,status);

@@ -4,6 +4,8 @@ import {randomUUID} from 'node:crypto';
 import {pool} from '../lib/db';
 import {perform} from '../lib/workflow';
 import type {Actor} from '../lib/auth';
+import {hashPassword} from '../lib/auth';
+import {customerLocation,monitorLocations,reportLocation,setLocationConsent} from '../lib/location';
 
 test('demo application passes role, signature, transfer, repayment, and ledger controls',async()=>{
   const users=await pool.query<Actor>('SELECT id,name,email,role,branch_id,customer_id FROM users WHERE email IN ($1,$2,$3)',
@@ -47,4 +49,46 @@ test('demo application passes role, signature, transfer, repayment, and ledger c
   const newCustomer=await perform(officer,{type:'customer',name:'Test Borrower',nik,phone:'081234567890',bankName:'Demo Bank',accountNumber:'0012345678'});
   await assert.rejects(perform(officer,{type:'customer',name:'Duplicate',nik,phone:'081234567890',bankName:'Demo Bank',accountNumber:'0012345678'}),/duplicate key/);
   assert.ok(newCustomer.id);
+});
+
+test('location sharing requires active loan and consent, excludes field staff, and stops on payoff',async()=>{
+  const users=await pool.query<Actor>('SELECT id,name,email,role,branch_id,customer_id FROM users WHERE email IN ($1,$2,$3)',
+    ['owner@local.test','officer@local.test','manager@local.test']);
+  const owner=users.rows.find(user=>user.role==='owner')!,officer=users.rows.find(user=>user.role==='officer')!,manager=users.rows.find(user=>user.role==='manager')!;
+  assert.ok(owner&&officer&&manager);
+  const customerRow=await pool.query('INSERT INTO customers(name,branch_id) VALUES($1,$2) RETURNING id',[`Nasabah lokasi ${randomUUID().slice(0,8)}`,officer.branch_id]);
+  const customerId=customerRow.rows[0].id;
+  const userRow=await pool.query<Actor>('INSERT INTO users(email,name,role,branch_id,customer_id,password_hash) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,name,email,role,branch_id,customer_id',
+    [`location-${randomUUID()}@local.test`,'Nasabah Uji','customer',officer.branch_id,customerId,hashPassword(randomUUID())]);
+  const customer=userRow.rows[0];
+  await assert.rejects(setLocationConsent(customer,true),/Active loan required/);
+  await assert.rejects(setLocationConsent(manager,true),/Forbidden/);
+  const application=await perform(officer,{type:'create',customerId,principal:300000,weeks:3});
+  await perform(owner,{type:'approve',applicationId:application.id});
+  await perform(customer,{type:'sign',applicationId:application.id});
+  await perform(owner,{type:'authorize',applicationId:application.id});
+  await perform(owner,{type:'initiate',applicationId:application.id,idempotencyKey:randomUUID()});
+  await perform(owner,{type:'confirm',applicationId:application.id,bankReference:`LOC${Date.now()}`.replace(/\D/g,''),proof:'Bukti penyelesaian demo'});
+  await assert.rejects(reportLocation(customer,-6.175,106.827,12),/Location consent required/);
+  await setLocationConsent(customer,true);
+  const report=await reportLocation(customer,-6.17532,106.82714,12);
+  assert.equal(report.latitude,-6.175);
+  assert.equal(report.longitude,106.827);
+  assert.equal(report.accuracy_m,150);
+  assert.equal((await customerLocation(customer)).enabled,true);
+  await assert.rejects(monitorLocations(officer),/Forbidden/);
+  await assert.rejects(reportLocation(owner,-6.175,106.827,12),/Forbidden/);
+  assert.ok((await monitorLocations(owner)).some(item=>item.customer_id===customerId&&item.latitude===-6.175));
+  assert.ok((await monitorLocations(manager)).some(item=>item.customer_id===customerId));
+  assert.ok(!(await monitorLocations({...manager,branch_id:randomUUID()})).some(item=>item.customer_id===customerId));
+  await setLocationConsent(customer,false);
+  await assert.rejects(reportLocation(customer,-6.175,106.827,12),/Location consent required/);
+  await setLocationConsent(customer,true);
+  await reportLocation(customer,-6.175,106.827,12);
+  await perform(owner,{type:'payment',applicationId:application.id,bankReference:randomUUID(),amount:306000});
+  const stopped=await customerLocation(customer);
+  assert.equal(stopped.active,false);
+  assert.equal(stopped.enabled,false);
+  assert.equal(stopped.latitude,null);
+  assert.ok(stopped.stopped_at);
 });

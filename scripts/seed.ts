@@ -2,15 +2,17 @@ import {pool} from '../lib/db';
 import {hashPassword} from '../lib/auth';
 
 const ownerPassword=process.env.DEMO_OWNER_PASSWORD;
+const managerPassword=process.env.DEMO_MANAGER_PASSWORD;
 const officerPassword=process.env.DEMO_OFFICER_PASSWORD;
 const customerPassword=process.env.DEMO_CUSTOMER_PASSWORD;
-if(!ownerPassword||!officerPassword||!customerPassword) throw new Error('Set all three demo passwords in .env.local');
+if(!ownerPassword||!managerPassword||!officerPassword||!customerPassword) throw new Error('Set all four demo passwords in .env.local');
 const branch=await pool.query('INSERT INTO branches(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id',['Jakarta Pusat']);
 const branchId=branch.rows[0].id;
 const customer=await pool.query('INSERT INTO customers(name,branch_id) SELECT $1,$2 WHERE NOT EXISTS(SELECT 1 FROM customers WHERE name=$1 AND branch_id=$2) RETURNING id',['Demo Borrower',branchId]);
 const customerId=customer.rows[0]?.id ?? (await pool.query('SELECT id FROM customers WHERE name=$1 AND branch_id=$2 LIMIT 1',['Demo Borrower',branchId])).rows[0].id;
 for(const [email,name,role,password,cid] of [
   ['owner@local.test','Demo Owner','owner',ownerPassword,null],
+  ['manager@local.test','Demo Manager','manager',managerPassword,null],
   ['officer@local.test','Demo Officer','officer',officerPassword,null],
   ['customer@local.test','Demo Borrower','customer',customerPassword,customerId]
 ] as const){
