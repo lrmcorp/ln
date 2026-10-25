@@ -2,10 +2,10 @@
 import {useEffect,useRef,useState} from 'react';
 import type {LocationState} from '@/lib/location';
 
-type Props={name:string;initial:LocationState};
+type Props={name:string;initial:LocationState;blank?:boolean};
 const time=(value:string|null)=>value?new Date(value).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'}):'Belum ada';
 
-export default function LocationApp({name,initial}:Props){
+export default function LocationApp({name,initial,blank=false}:Props){
   const [location,setLocation]=useState(initial);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -34,6 +34,7 @@ export default function LocationApp({name,initial}:Props){
     if(!location.active||!location.enabled) return;
     if(!navigator.geolocation){setDeviceStatus('Perangkat ini tidak menyediakan lokasi.');return;}
     let stopped=false;
+    let permissionRevocationStarted=false;
     const report=(position:GeolocationPosition)=>{
       if(stopped) return;
       const coordinateKey=`${Math.round(position.coords.latitude*1000)},${Math.round(position.coords.longitude*1000)}`;
@@ -47,6 +48,7 @@ export default function LocationApp({name,initial}:Props){
     };
     const failed=(cause:GeolocationPositionError)=>{
       if(stopped)return;
+      if(cause.code===1&&!permissionRevocationStarted){permissionRevocationStarted=true;void consent(false);}
       setDeviceStatus(cause.code===1?'Izin lokasi perangkat ditolak. Ubah izin di pengaturan browser.':'Lokasi perangkat belum tersedia. Coba lagi saat sinyal membaik.');
     };
     const options:PositionOptions={enableHighAccuracy:false,maximumAge:10000,timeout:15000};
@@ -56,6 +58,8 @@ export default function LocationApp({name,initial}:Props){
   },[location.active,location.enabled]);
 
   async function signOut(){await fetch('/api/logout',{method:'POST'});window.location.reload();}
+
+  if(blank)return null;
 
   return <main className="locationApp"><header className="locationHeader"><span className="brand">LN <span>Lokasi</span></span><button className="textButton" onClick={signOut}>Keluar</button></header>
     <div className="locationContent"><div className="locationIntro"><small>Nasabah · {name}</small><h1>Lokasi saya</h1><p>Anda mengendalikan kapan lokasi dibagikan.</p></div>

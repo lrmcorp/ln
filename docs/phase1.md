@@ -2,7 +2,7 @@
 
 ## Current monthly intake update (2026-10-25)
 
-The latest user direction supersedes the older weekly example and customer-signing sequence below. The field officer now starts a three-step mobile intake: identity and encrypted KTP/video evidence, monthly amount and schedule, then borrower review and demo signature on the officer's device. A related customer account may open the separate signing page; newly created borrowers do not receive their own login yet. The customer home remains location only. The owner manually reviews evidence and approves only the exact signed terms snapshot before release. A changed agreement requires a new version and signature, but that revision flow is not yet built. Monthly installments begin on the 1st of the month after signing, with principal and total flat interest split across months. Terms show a simple late fee at the policy's monthly rate, initially 5% of original principal, prorated daily with a fixed 30-day divisor after the due date. Fee accrual and payment allocation are not yet implemented, so the demo ledger does not enforce that term. The old weekly route remains for compatibility and tests; it is not the primary UI flow.
+The latest user direction supersedes the older weekly example and customer-signing sequence below. The field officer now starts a three-step mobile intake: identity and encrypted KTP/video evidence, monthly amount and schedule, then borrower review and demo signature on the officer's device. A related customer account may open the separate signing page; newly created borrowers do not receive their own login yet. The customer home is blank; the separate `/izin-lokasi` route holds the explicit opt-in/withdrawal controls. Previously consented reporting still runs when the blank page is open. The owner manually reviews evidence and approves only the exact signed terms snapshot before release. A changed agreement requires a new version and signature, but that revision flow is not yet built. Monthly installments begin on the 1st of the month after signing, with principal and total flat interest split across months. Terms show a simple late fee at the policy's monthly rate, initially 5% of original principal, prorated daily with a fixed 30-day divisor after the due date. Fee accrual and payment allocation are not yet implemented, so the demo ledger does not enforce that term. The old weekly route remains for compatibility and tests; it is not the primary UI flow.
 
 ## Architecture and module map
 
@@ -92,15 +92,15 @@ No receivable exists at approval or signing. The disbursement journal is created
 | Sign in | Enter role-specific local workspace | Working demo session |
 | Owner overview | Review receivables, pending and active cases | Working, ledger-backed amounts |
 | Loan register | Inspect status, approved schedule, collections | Working |
-| Borrower intake | Capture synthetic identity and bank summary | Working subset; no evidence upload |
-| Officer application | Submit an amount and term | Working subset |
+| Borrower intake | Capture synthetic identity, bank details, encrypted KTP photo and video | Working demo; liveness requires manual review |
+| Officer application | Monthly amount and schedule, then borrower demo signature | Working demo on officer device |
 | Owner policy | Create new policy version | Working subset |
 | Owner decision and transfer | Approve, release, initiate, confirm | Working with demo settlement |
-| Customer location | Start/stop optional sharing, inspect permission and last report | Working foreground web demo |
+| Customer location | Blank home runs consented reporting; `/izin-lokasi` manages permission and withdrawal | Working foreground web demo |
 | Superadmin/manager location | View latest coarse location for active, consented cases | Working branch-scoped demo; no map or boundary |
 | Payment and closure | Verify partial/full payment, close case | Working |
 
-Staff journey: create borrower, submit case, track status. Owner journey: review case and economics, approve, monitor signature, authorize and reconcile transfer, verify payments, close; a separate location view shows current consented reports. Manager journey: view only branch-scoped location reports. Customer web journey: sign in, choose whether to share location while an active case exists, and see permission and latest-report status. The customer web screen no longer exposes a loan dashboard or signing control per the latest user scope. The internal demo signing API remains for workflow tests until a separate signing channel is built.
+Staff journey: complete the three-step intake and hand the signing page to the borrower. Owner journey: review identity evidence, approve the same signed terms, authorize and reconcile transfer, verify payments, close; a separate location view shows current consented reports. Manager journey: view only branch-scoped location reports. Customer web journey: sign in to a blank home; the separately addressable `/izin-lokasi` page provides opt-in, withdrawal, and permission status. Reporting continues only while an enabled customer page remains open. The older internal demo signing API remains for legacy workflow tests.
 
 ## Acceptance matrix and milestones
 
