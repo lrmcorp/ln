@@ -30,13 +30,13 @@ Pemilik melihat saldo pokok dan bunga dari pembukuan, jumlah pengajuan, serta da
 
 ## Pratinjau tampilan
 
-- [Desktop pemilik](docs/previews/desktop-pemilik.png)
-- [Ponsel pemilik](docs/previews/mobile-pemilik.png)
-- [Ponsel petugas](docs/previews/mobile-petugas.png)
-- [Ponsel nasabah](docs/previews/mobile-nasabah.png)
-- [Detail pinjaman nasabah](docs/previews/mobile-nasabah-detail.png)
+- [Desktop pemilik](public/pratinjau/desktop-pemilik.png)
+- [Ponsel pemilik](public/pratinjau/mobile-pemilik.png)
+- [Ponsel petugas](public/pratinjau/mobile-petugas.png)
+- [Ponsel nasabah](public/pratinjau/mobile-nasabah.png)
+- [Detail pinjaman nasabah](public/pratinjau/mobile-nasabah-detail.png)
 
-Gambar diambil dari aplikasi lokal dengan data demo sintetis pada 25 Oktober 2026. Isi data demo dapat berubah setelah pengujian berikutnya.
+Gambar juga dapat dibuka pada server lokal melalui `/pratinjau/mobile-nasabah.png` dan URL serupa untuk peran lain. Gambar diambil dari aplikasi lokal dengan data demo sintetis pada 25 Oktober 2026. Isi data demo dapat berubah setelah pengujian berikutnya.
 
 ## Dokumentasi
 
