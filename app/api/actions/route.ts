@@ -30,13 +30,17 @@ const errors:Record<string,string>={
   'Ledger obligations must be paid off':'Seluruh kewajiban pembukuan harus lunas',
   'Invalid financial inputs':'Data keuangan tidak valid',
   'Amount exceeds safe range':'Jumlah melebihi batas yang didukung',
-  'Unbalanced journal':'Catatan pembukuan tidak seimbang'
+  'Unbalanced journal':'Catatan pembukuan tidak seimbang',
+  'Identity review required':'Bukti identitas harus ditinjau pemilik sebelum persetujuan',
+  'Identity review not allowed':'Bukti belum dapat ditinjau atau alasan kosong',
+  'Identity evidence missing':'Bukti identitas tidak ditemukan'
 };
 const schema=z.discriminatedUnion('type',[
-  z.object({type:z.literal('policy'),minPrincipal:z.number().int(),maxPrincipal:z.number().int(),flatInterestBps:z.number().int(),minWeeks:z.number().int(),maxWeeks:z.number().int()}),
+  z.object({type:z.literal('policy'),minPrincipal:z.number().int(),maxPrincipal:z.number().int(),flatInterestBps:z.number().int(),minWeeks:z.number().int(),maxWeeks:z.number().int(),minMonths:z.number().int().optional(),maxMonths:z.number().int().optional(),lateFeeMonthlyBps:z.number().int().optional()}),
   z.object({type:z.literal('customer'),name:z.string().min(1).max(200),nik:z.string().regex(/^[0-9]{16}$/),phone:z.string().min(8).max(20),bankName:z.string().min(1).max(100),accountNumber:z.string().regex(/^[0-9]{5,30}$/)}),
   z.object({type:z.literal('create'),customerId:uuid,principal:z.number().int().positive(),weeks:z.number().int().positive()}),
   z.object({type:z.literal('approve'),applicationId:uuid,reason:z.string().max(500).optional()}),
+  z.object({type:z.literal('review_evidence'),applicationId:uuid,reason:z.string().min(1).max(500)}),
   z.object({type:z.literal('sign'),applicationId:uuid}),
   z.object({type:z.literal('authorize'),applicationId:uuid}),
   z.object({type:z.literal('initiate'),applicationId:uuid,idempotencyKey:z.string().min(1).max(100)}),

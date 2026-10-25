@@ -1,0 +1,38 @@
+import {NextResponse} from 'next/server';
+import {z} from 'zod';
+import {currentActor} from '@/lib/auth';
+import {createMonthlyIntake} from '@/lib/intake';
+
+const details=z.object({
+  name:z.string().trim().min(1).max(200),nik:z.string().regex(/^\d{16}$/),dateOfBirth:z.iso.date(),
+  phone:z.string().min(8).max(20),address:z.string().trim().min(1).max(500),motherName:z.string().trim().min(1).max(200),
+  bankName:z.string().trim().min(1).max(100),bankAccountNumber:z.string().regex(/^\d{5,30}$/),accountHolder:z.string().trim().min(1).max(200),
+  occupation:z.string().max(200),loanPurpose:z.string().max(300),principal:z.number().int().positive(),months:z.number().int().positive()
+});
+
+export async function POST(request:Request){
+  const origin=request.headers.get('origin');
+  if(origin&&new URL(origin).host!==request.headers.get('host'))return NextResponse.json({error:'Permintaan dari asal berbeda ditolak'},{status:403});
+  const actor=await currentActor();
+  if(!actor)return NextResponse.json({error:'Silakan masuk terlebih dahulu'},{status:401});
+  if(actor.role!=='officer')return NextResponse.json({error:'Hanya petugas lapangan yang dapat membuat pengajuan'},{status:403});
+  try{
+    const form=await request.formData();
+    const ktp=form.get('ktp'),liveness=form.get('liveness');
+    if(!(ktp instanceof File)||!(liveness instanceof File)||ktp.size>4*1024*1024||liveness.size>12*1024*1024)throw new Error('Invalid evidence files');
+    const input=details.parse({name:form.get('name'),nik:form.get('nik'),dateOfBirth:form.get('dateOfBirth'),phone:form.get('phone'),
+      address:form.get('address'),motherName:form.get('motherName'),bankName:form.get('bankName'),bankAccountNumber:form.get('bankAccountNumber'),
+      accountHolder:form.get('accountHolder'),occupation:form.get('occupation')??'',loanPurpose:form.get('loanPurpose')??'',
+      principal:Number(form.get('principal')),months:Number(form.get('months'))});
+    const result=await createMonthlyIntake(actor,input,new Uint8Array(await ktp.arrayBuffer()),new Uint8Array(await liveness.arrayBuffer()));
+    return NextResponse.json(result,{status:201});
+  }catch(error){
+    const message=error instanceof Error?error.message:'';
+    const conflict=/duplicate key|unique constraint/i.test(message);
+    const known:Record<string,string>={'Invalid borrower details':'Data nasabah belum lengkap atau tidak valid','No active policy':'Belum ada kebijakan aktif',
+      'Outside policy limits':'Jumlah atau tenor di luar kebijakan','Invalid KTP photo size':'Ukuran foto KTP tidak valid',
+      'Invalid liveness video size':'Ukuran video tantangan tidak valid','Unsupported evidence format':'Gunakan JPG/PNG untuk KTP dan MP4/WebM untuk video',
+      'Invalid evidence files':'Foto KTP dan video tantangan wajib diunggah dalam batas ukuran'};
+    return NextResponse.json({error:conflict?'NIK sudah terdaftar':error instanceof z.ZodError?'Periksa kembali data pengajuan':known[message]??'Pengajuan gagal disimpan'},{status:conflict?409:400});
+  }
+}

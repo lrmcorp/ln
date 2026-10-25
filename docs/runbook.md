@@ -2,13 +2,16 @@
 
 ## API contract, current increment
 
-All routes accept JSON. Authentication uses a signed, HTTP-only, same-site session cookie. Mutating action requests are checked against the request origin and user role. Errors return `{ "error": "..." }` with a non-2xx status. This is an internal development API and should be versioned before native clients use it.
+Routes accept JSON except `/api/intake`, which accepts multipart form data. Authentication uses a signed, HTTP-only, same-site session cookie. Mutating action requests are checked against the request origin and user role. Errors return `{ "error": "..." }` with a non-2xx status. This is an internal development API and should be versioned before native clients use it.
 
 | Route | Request | Result |
 | --- | --- | --- |
 | `POST /api/login` | `{email,password}` | Session cookie |
 | `POST /api/logout` | `{}` | Clears cookie |
 | `POST /api/actions` | Discriminated action object below | New ID, version, receipt or allocation |
+| `POST /api/intake` | Officer multipart identity, KTP photo, liveness video, principal, months | New monthly application ID |
+| `POST /api/signing` | Related customer or assigned officer: application ID, name, acceptance, displayed terms hash, signature PNG data URL | Signed agreement hash |
+| `GET /api/evidence/{applicationId}/{ktp\|liveness}` | Owner or assigned officer session | Audited encrypted evidence retrieval |
 | `GET /api/location` | Session cookie | Own status for customer; scoped latest reports for owner/manager; officer denied |
 | `POST /api/location` | Customer `consent` or `report` JSON | Updates permission or latest rounded location |
 

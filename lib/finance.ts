@@ -25,6 +25,19 @@ export function calculateFlatSchedule(principal:number, bps:number, weeks:number
   return {interest,total:principal+interest,installments};
 }
 
+export function calculateMonthlySchedule(principal:number,bps:number,months:number,start:Date):{interest:number;total:number;installments:Installment[]}{
+  if(![principal,bps,months].every(Number.isSafeInteger)||principal<=0||bps<0||months<=0||months>60) throw new Error('Invalid financial inputs');
+  const interest=Number((BigInt(principal)*BigInt(bps)+5000n)/10000n);
+  if(!Number.isSafeInteger(interest)||!Number.isSafeInteger(principal+interest)) throw new Error('Amount exceeds safe range');
+  const installments=Array.from({length:months},(_,i)=>{
+    const due=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+i+1,1));
+    return {sequence:i+1,dueAt:due.toISOString().slice(0,10),
+      principal:Math.floor(principal/months)+(i<principal%months?1:0),
+      interest:Math.floor(interest/months)+(i<interest%months?1:0)};
+  });
+  return {interest,total:principal+interest,installments};
+}
+
 export function allocatePayment(amount:number, remainingPrincipal:number, remainingInterest:number) {
   if (![amount,remainingPrincipal,remainingInterest].every(Number.isSafeInteger) || amount<=0 || remainingPrincipal<0 || remainingInterest<0) throw new Error('Invalid payment');
   if (amount > remainingPrincipal+remainingInterest) throw new Error('Overpayment requires review');

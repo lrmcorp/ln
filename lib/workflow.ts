@@ -6,10 +6,11 @@ import {requireRole} from './auth';
 import {allocatePayment, assertBalanced, calculateFlatSchedule, canonicalJson, jakartaToday} from './finance';
 
 type Action =
- | {type:'policy';minPrincipal:number;maxPrincipal:number;flatInterestBps:number;minWeeks:number;maxWeeks:number}
+ | {type:'policy';minPrincipal:number;maxPrincipal:number;flatInterestBps:number;minWeeks:number;maxWeeks:number;minMonths?:number;maxMonths?:number;lateFeeMonthlyBps?:number}
  | {type:'customer';name:string;nik:string;phone:string;bankName:string;accountNumber:string}
  | {type:'create';customerId:string;principal:number;weeks:number}
  | {type:'approve';applicationId:string;reason?:string}
+ | {type:'review_evidence';applicationId:string;reason:string}
  | {type:'sign';applicationId:string}
  | {type:'authorize';applicationId:string}
  | {type:'initiate';applicationId:string;idempotencyKey:string}
@@ -48,16 +49,20 @@ export async function perform(actor:Actor|null, action:Action){
   return transaction(async c=>{
     if(action.type==='policy'){
       requireRole(actor,['owner']);
-      if(![action.minPrincipal,action.maxPrincipal,action.flatInterestBps,action.minWeeks,action.maxWeeks].every(Number.isSafeInteger)||
-        action.minPrincipal<=0||action.maxPrincipal<action.minPrincipal||action.maxPrincipal>1000000000||
-        action.flatInterestBps<0||action.flatInterestBps>10000||action.minWeeks<1||action.maxWeeks<action.minWeeks||action.maxWeeks>260) throw new Error('Invalid policy limits');
       await c.query('SELECT pg_advisory_xact_lock(710102)');
       const previous=(await c.query('SELECT * FROM policy_versions ORDER BY version DESC LIMIT 1')).rows[0];
+      const minMonths=action.minMonths??previous?.min_months??1;
+      const maxMonths=action.maxMonths??previous?.max_months??12;
+      const lateFeeMonthlyBps=action.lateFeeMonthlyBps??previous?.late_fee_monthly_bps??500;
+      if(![action.minPrincipal,action.maxPrincipal,action.flatInterestBps,action.minWeeks,action.maxWeeks,minMonths,maxMonths,lateFeeMonthlyBps].every(Number.isSafeInteger)||
+        action.minPrincipal<=0||action.maxPrincipal<action.minPrincipal||action.maxPrincipal>1000000000||
+        action.flatInterestBps<0||action.flatInterestBps>10000||action.minWeeks<1||action.maxWeeks<action.minWeeks||action.maxWeeks>260||
+        minMonths<1||maxMonths<minMonths||maxMonths>60||lateFeeMonthlyBps<0||lateFeeMonthlyBps>10000) throw new Error('Invalid policy limits');
       const version=Number(previous?.version??0)+1;
-      const result=await c.query('INSERT INTO policy_versions(version,min_principal,max_principal,flat_interest_bps,min_weeks,max_weeks,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-        [version,action.minPrincipal,action.maxPrincipal,action.flatInterestBps,action.minWeeks,action.maxWeeks,actor.id]);
+      const result=await c.query('INSERT INTO policy_versions(version,min_principal,max_principal,flat_interest_bps,min_weeks,max_weeks,min_months,max_months,late_fee_monthly_bps,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
+        [version,action.minPrincipal,action.maxPrincipal,action.flatInterestBps,action.minWeeks,action.maxWeeks,minMonths,maxMonths,lateFeeMonthlyBps,actor.id]);
       await c.query('INSERT INTO audit_events(actor_id,subject_type,subject_id,action,before_data,after_data) VALUES($1,$2,$3,$4,$5,$6)',
-        [actor.id,'policy',result.rows[0].id,'version_created',JSON.stringify(previous??null),JSON.stringify({...action,version})]);
+        [actor.id,'policy',result.rows[0].id,'version_created',JSON.stringify(previous??null),JSON.stringify({...action,minMonths,maxMonths,lateFeeMonthlyBps,version})]);
       return {id:result.rows[0].id,version};
     }
     if(action.type==='customer'){
@@ -88,8 +93,29 @@ export async function perform(actor:Actor|null, action:Action){
     if(actor.role==='officer' && (app.officer_id!==actor.id || app.branch_id!==actor.branch_id)) throw new Error('Unassigned application');
     if(actor.role==='customer' && app.customer_id!==actor.customer_id) throw new Error('Unrelated application');
     switch(action.type){
+      case 'review_evidence': {
+        requireRole(actor,['owner']);
+        if(!['awaiting_signature','signed_pending_approval'].includes(app.status)||!action.reason.trim())throw new Error('Identity review not allowed');
+        const evidence=await c.query(`UPDATE intake_evidence SET verification_status='manual_review_completed'
+          WHERE application_id=$1 RETURNING application_id`,[app.id]);
+        if(!evidence.rows[0])throw new Error('Identity evidence missing');
+        await audit(c,actor,app.id,'identity_manual_review_completed',null,{status:'manual_review_completed'},action.reason.trim());
+        return {id:app.id};
+      }
       case 'approve': {
         requireRole(actor,['owner']);
+        if(app.status==='signed_pending_approval'){
+          const reviewed=(await c.query('SELECT verification_status FROM intake_evidence WHERE application_id=$1',[app.id])).rows[0];
+          if(reviewed?.verification_status!=='manual_review_completed')throw new Error('Identity review required');
+          const agreement=(await c.query('SELECT * FROM agreements WHERE application_id=$1 ORDER BY version DESC LIMIT 1 FOR UPDATE',[app.id])).rows[0];
+          const signature=agreement?(await c.query('SELECT agreement_id FROM signature_evidence WHERE agreement_id=$1',[agreement.id])).rows[0]:null;
+          if(!agreement?.signed_at||!signature||createHash('sha256').update(canonicalJson(agreement.snapshot)).digest('hex')!==agreement.snapshot_hash||
+            Number(agreement.snapshot.principal)!==Number(app.requested_principal)||agreement.snapshot.policyId!==app.policy_id)throw new Error('Signed terms mismatch');
+          await c.query('UPDATE applications SET status=$1,approved_principal=$2,interest_amount=$3,approved_at=now() WHERE id=$4',
+            ['signed',agreement.snapshot.principal,agreement.snapshot.interest,app.id]);
+          await audit(c,actor,app.id,'signed_terms_approved',{status:app.status},{status:'signed',snapshotHash:agreement.snapshot_hash},action.reason);
+          return {id:app.id,hash:agreement.snapshot_hash};
+        }
         if(app.status!=='submitted'||app.officer_id===actor.id) throw new Error('Approval not allowed');
         const policy=(await c.query('SELECT * FROM policy_versions ORDER BY version DESC LIMIT 1')).rows[0];
         const principal=Number(app.requested_principal);
