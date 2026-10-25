@@ -32,7 +32,7 @@ npm run dev
 
 `.env.local` is ignored and contains locally generated demo credentials. `npm run env:init` preserves existing credentials and appends a manager demo password if missing. Never print or commit the file. The cloud environment draft has saved installation and startup instructions. Its startup instruction begins by reading this handoff. A saved draft is not publication; check environment settings and publish status separately.
 
-GitHub sync is pending. `git push origin main` failed because the injected `GH_TOKEN` was rejected by GitHub. Do not claim the local UI or preview updates are on GitHub until a push succeeds. Check `git log -1` for the current local commit. Do not print or copy the token into commands or files.
+The customer location update and preview images were pushed to `origin/main` on 2026-10-25. Earlier pushes failed while `GH_TOKEN` was invalid, but the later push succeeded. Check `git status` and `git log -1` for the current checkout state. Do not print or copy the token into commands or files.
 
 The demo signature and bank actions require `ENABLE_DEMO_ADAPTERS=true`. The UI labels them as simulations. Production use needs verified providers and the missing controls listed in `docs/phase1.md`.
 
@@ -103,3 +103,4 @@ Owner MFA and high-assurance actions, customer-direct activation with separate c
 - **2026-10-25:** Moved the synthetic preview captures into `public/pratinjau/` so the running local server can show them at stable URLs without a sign-in. Checked the image URLs after restarting the server. GitHub publication remains pending credential repair.
 - **2026-10-25:** Corrected the customer app scope to location only, added a branch-scoped manager monitor and superadmin monitor, and denied field officers at the API and page. Added explicit active-loan consent, coarse latest-report storage, withdrawal, payoff auto-stop, freshness labels, and location access audit. Removed the customer loan dashboard/signing controls from rendered UI and replaced customer previews with location screens. Verified six tests, typecheck/build, browser permissions and role access, 320px/390px layouts, and Hallmark source/render sweep. Geofence boundary detection and background tracking remain unimplemented.
 - **2026-10-25:** Found and fixed a browser reporting delay: same-point reports are throttled, but changed rounded coordinates are sent immediately. Repeated the live browser test; manager updates, withdrawal hiding, and re-enabling passed.
+- **2026-10-25:** Pushed the Indonesian UI, revised customer location app, manager/superadmin monitor, tests, docs, and current previews to GitHub `main`. The previously invalid GitHub credential was accepted on this later push.
