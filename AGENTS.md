@@ -2,6 +2,8 @@
 
 Before changing files in this repository, read `handoff.md`. Then read the relevant product and API documents it links. After every change, revise `handoff.md` with the new state, validation, and remaining risks. Never put credentials or customer identity values in that file.
 
+After validating each completed update, commit and push it to `origin/main` when the user has authorized publication. The user authorized immediate GitHub publication for future updates on 2026-10-27. Once a VPS deployment target and access are configured, deploy the same commit promptly and verify the deployed version. Record the commit and deployment result in `handoff.md`. Do not claim a VPS deploy succeeded until a server check confirms it; use only synthetic demo data because this project has production blockers.
+
 <!-- antislop:start -->
 ## antislop
 For UI, copy, people, mobile layout, or code comments work, read these installed skill files directly (use these paths even if a same-named global skill exists):
