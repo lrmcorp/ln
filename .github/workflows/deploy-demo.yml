@@ -54,3 +54,5 @@ jobs:
         run: |
           ssh -i "$HOME/.ssh/ln_vps" -o StrictHostKeyChecking=yes ubuntu@43.152.240.47 \
             "cd ~/ln && bash deploy/init-vps-env.sh && sudo -n docker compose --env-file .env.vps -f deploy/compose.yaml up -d --build && test \"\$(cat .deploy-revision)\" = '$GITHUB_SHA' && curl -fsS --retry 20 --retry-delay 3 --retry-connrefused http://127.0.0.1:3000/pratinjau >/dev/null"
+      - name: Verify public preview
+        run: curl -fsSL --retry 10 --retry-delay 3 --retry-all-errors http://43.152.240.47/pratinjau >/dev/null

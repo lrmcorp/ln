@@ -17,7 +17,7 @@ Target yang diketahui: Ubuntu 24.04 dengan Docker 29, IP `43.152.240.47`, penggu
    - `VPS_HOST_KEY`: satu baris host key publik dari langkah 2.
 4. Pastikan firewall Tencent mengizinkan koneksi SSH port 22 dari GitHub Actions dan port 80/443 untuk pengunjung. Di tab **Variables**, buat `VPS_DEPLOY_ENABLED=true`. Lalu jalankan workflow **Deploy demo to Tencent Lighthouse** melalui **Actions → Run workflow**. Setelah berhasil, setiap push ke `main` memicu validasi dan deploy otomatis.
 
-Jangan kirim kunci privat atau kata sandi melalui chat atau commit. Workflow hanya memakai kunci dari GitHub Secret, memverifikasi host key, lalu menyalin commit yang diuji ke `~/ln` melalui SSH. Server membuat `.env.vps` sekali dengan izin berkas 0600 dan mempertahankannya pada deploy berikutnya. Database PostgreSQL tersimpan di volume Docker; deploy tidak menjalankan `down -v`.
+Jangan kirim kunci privat atau kata sandi melalui chat atau commit. Workflow hanya memakai kunci dari GitHub Secret, memverifikasi host key, lalu menyalin commit yang diuji ke `~/ln` melalui SSH. Setelah layanan dimulai, workflow memeriksa pratinjau dari luar VPS agar aturan firewall dan proxy ikut teruji. Server membuat `.env.vps` sekali dengan izin berkas 0600 dan mempertahankannya pada deploy berikutnya. Database PostgreSQL tersimpan di volume Docker; deploy tidak menjalankan `down -v`.
 
 ## Akses sebelum ada domain
 
