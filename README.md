@@ -32,6 +32,16 @@ Nasabah menandatangani sebelum persetujuan pemilik. Pemilik meninjau foto dan vi
 
 **Beranda nasabah kosong.** Bila nasabah telah memberi izin berbagi lokasi, halaman tetap menjalankan pelaporan lokasi selama pinjaman aktif, halaman terbuka, perangkat mengizinkan, dan jaringan tersedia. Untuk memberi atau mencabut izin secara sadar, nasabah membuka halaman terpisah `/izin-lokasi`; penolakan sebelumnya tidak diaktifkan ulang otomatis. Penolakan izin perangkat juga menghentikan persetujuan di server dan menghapus koordinat terakhir. Menutup halaman atau membiarkan browser menghentikannya dapat menghentikan pembaruan: pelacakan latar belakang perangkat dan batas geofence belum tersedia. Hanya superadmin dan manajer cabang yang dapat melihat laporan terbaru di `/lokasi`. Petugas lapangan tidak dapat melihatnya. Penolakan izin tidak menghalangi alur pinjaman yang dioperasikan staf. Lokasi browser dapat dipalsukan dan belum layak dipakai sebagai bukti keberadaan.
 
+## APK Android nasabah (demo)
+
+[Unduh APK demo Android](public/unduhan/ln-lokasi-demo-debug.apk). APK ini memakai tanda tangan debug dan **hanya untuk pengujian dengan data rekaan**. Sumber dan cara build ada di [android-customer/README.md](android-customer/README.md).
+
+1. Setelah pemilik mengonfirmasi pencairan sehingga status pinjaman **Aktif**, petugas atau pemilik membuka detail pinjaman dan memilih **Buat kode pemasangan APK**. Kode berlaku 24 jam dan hanya dapat digunakan sekali.
+2. Nasabah memasang APK, membuka aplikasi sekali, memasukkan alamat server dan kode tersebut, lalu menyetujui berbagi lokasi serta memberikan izin lokasi Android **sepanjang waktu**. Android meminta izin setelah aplikasi dibuka, bukan selama proses instalasi.
+3. Layar utama kemudian kosong. Layanan lokasi Android tetap berjalan saat layar aplikasi ditutup, dengan pemberitahuan yang dapat dipakai untuk menghentikan berbagi. Server hanya menerima laporan selama pinjaman aktif dan izin masih berlaku; ketika seluruh pinjaman nasabah lunas, token perangkat dicabut dan lokasi terakhir dihapus.
+
+Pada emulator Android, APK debug dapat memakai `http://10.0.2.2:3000` jika server Next.js berjalan di komputer emulator. Pada ponsel fisik, gunakan alamat **HTTPS publik yang dapat dijangkau ponsel**. Server `localhost` tidak dapat diakses langsung dari ponsel. Android dapat menghentikan layanan karena penghematan baterai, paksa berhenti, atau pembatasan perangkat; ini belum menjamin pelacakan tanpa putus dan belum mendeteksi batas wilayah geofence.
+
 Pemilik melihat saldo pokok dan bunga dari pembukuan, jumlah pengajuan, serta daftar pinjaman. Petugas hanya dapat melihat kasus yang ditugaskan. Antarmuka mendukung layar ponsel dan tidak memerlukan akun penyedia layanan eksternal.
 
 ## Pratinjau tampilan
@@ -57,4 +67,4 @@ Gambar juga dapat dibuka pada server lokal melalui `/pratinjau/mobile-nasabah.pn
 
 ## Batas demo
 
-Tahap ini mencakup alur demo dan sejumlah kegagalan penting. Foto KTP, video, rincian identitas tambahan, dan gambar tanda tangan tersimpan terenkripsi, tetapi video belum membuktikan liveness secara otomatis. Aktivasi langsung nasabah, MFA pemilik, penyedia tanda tangan sah, integrasi bank, penagihan denda dan pembayaran tertunggak, perlindungan semua kolom sensitif, pembatasan permintaan dengan Redis, geofence berbatas wilayah, pelacakan latar belakang, pengembalian dana, proses latar, cadangan data, dan aplikasi Flutter belum tersedia. Semua itu masih menjadi syarat sebelum penggunaan nyata. Lihat rencana dan matriks penerimaan di `docs/phase1.md`.
+Tahap ini mencakup alur demo dan sejumlah kegagalan penting. Foto KTP, video, rincian identitas tambahan, dan gambar tanda tangan tersimpan terenkripsi, tetapi video belum membuktikan liveness secara otomatis. APK Android memiliki layanan lokasi latar belakang demo, tetapi belum diuji pada perangkat fisik dan belum menjamin pembaruan terus-menerus. MFA pemilik, penyedia tanda tangan sah, integrasi bank, penagihan denda dan pembayaran tertunggak, perlindungan semua kolom sensitif, pembatasan permintaan dengan Redis, geofence berbatas wilayah, pengembalian dana, proses latar, cadangan data, dan aplikasi Flutter belum tersedia. Semua itu masih menjadi syarat sebelum penggunaan nyata. Lihat rencana dan matriks penerimaan di `docs/phase1.md`.

@@ -116,6 +116,20 @@ CREATE TABLE IF NOT EXISTS location_shares (
   CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
   CHECK (accuracy_m IS NULL OR accuracy_m >= 0)
 );
+CREATE TABLE IF NOT EXISTS mobile_enrollments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL REFERENCES applications(id),
+  customer_id uuid NOT NULL REFERENCES customers(id), code_hash text UNIQUE NOT NULL,
+  issued_by uuid NOT NULL REFERENCES users(id), expires_at timestamptz NOT NULL,
+  consumed_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS mobile_devices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid NOT NULL REFERENCES customers(id),
+  enrollment_id uuid NOT NULL REFERENCES mobile_enrollments(id), token_hash text UNIQUE NOT NULL,
+  sharing_enabled boolean NOT NULL DEFAULT false, consented_at timestamptz,
+  revoked_at timestamptz, last_seen_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS mobile_devices_current_customer_idx ON mobile_devices(customer_id) WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS mobile_enrollments_customer_idx ON mobile_enrollments(customer_id,expires_at);
 CREATE INDEX IF NOT EXISTS applications_officer_idx ON applications(officer_id,status);
 CREATE INDEX IF NOT EXISTS applications_branch_idx ON applications(branch_id,status);
 CREATE INDEX IF NOT EXISTS audit_subject_idx ON audit_events(subject_type,subject_id);

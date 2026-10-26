@@ -34,6 +34,8 @@ async function setStatus(c:PoolClient,actor:Actor,app:Record<string,unknown>,sta
   if(status==='paid_off'||status==='closed'){
     await c.query(`UPDATE location_shares SET enabled=false,stopped_at=now(),latitude=NULL,longitude=NULL,accuracy_m=NULL,reported_at=NULL,updated_at=now()
       WHERE customer_id=$1 AND enabled=true AND NOT EXISTS(SELECT 1 FROM applications WHERE customer_id=$1 AND status='active')`,[app.customer_id]);
+    await c.query(`UPDATE mobile_devices SET revoked_at=now(),sharing_enabled=false
+      WHERE customer_id=$1 AND revoked_at IS NULL AND NOT EXISTS(SELECT 1 FROM applications WHERE customer_id=$1 AND status='active')`,[app.customer_id]);
   }
   await audit(c,actor,String(app.id),status,{status:app.status},{status},reason);
 }
