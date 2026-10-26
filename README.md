@@ -46,6 +46,8 @@ Pemilik melihat saldo pokok dan bunga dari pembukuan, jumlah pengajuan, serta da
 
 ## Pratinjau tampilan
 
+Buka `/pratinjau` pada server lokal untuk memilih akses Pemilik, Manajer, Petugas, atau Nasabah dalam satu halaman. Cuplikannya memakai data rekaan dan bersifat statis; gunakan login aplikasi untuk mencoba alur yang aktif.
+
 - [Desktop pemilik](public/pratinjau/desktop-pemilik.png)
 - [Ponsel pemilik](public/pratinjau/mobile-pemilik.png)
 - [Ponsel petugas](public/pratinjau/mobile-petugas.png)
