@@ -1,0 +1,56 @@
+name: Deploy demo to Tencent Lighthouse
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ln-demo-vps
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+        env:
+          DATABASE_URL: postgres://build:build@127.0.0.1/build
+          SESSION_SECRET: build-only-placeholder-32-characters-long
+          DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+  deploy:
+    needs: validate
+    if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare pinned SSH identity
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
+        run: |
+          test -n "$VPS_SSH_KEY" && test -n "$VPS_HOST_KEY"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/ln_vps"
+          printf '%s\n' "$VPS_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/ln_vps" "$HOME/.ssh/known_hosts"
+          ssh-keygen -F 43.152.240.47 -f "$HOME/.ssh/known_hosts" >/dev/null
+      - name: Upload exact commit
+        run: |
+          printf '%s\n' "$GITHUB_SHA" > .deploy-revision
+          ssh -i "$HOME/.ssh/ln_vps" -o StrictHostKeyChecking=yes ubuntu@43.152.240.47 'mkdir -p ~/ln'
+          rsync -az --delete -e "ssh -i $HOME/.ssh/ln_vps -o StrictHostKeyChecking=yes" \
+            --exclude='.git/' --exclude='.next/' --exclude='node_modules/' \
+            --exclude='.env*' ./ ubuntu@43.152.240.47:~/ln/
+      - name: Start and verify demo
+        run: |
+          ssh -i "$HOME/.ssh/ln_vps" -o StrictHostKeyChecking=yes ubuntu@43.152.240.47 \
+            "cd ~/ln && bash deploy/init-vps-env.sh && sudo -n docker compose --env-file .env.vps -f deploy/compose.yaml up -d --build && test \"\$(cat .deploy-revision)\" = '$GITHUB_SHA' && curl -fsS --retry 20 --retry-delay 3 --retry-connrefused http://127.0.0.1:3000/pratinjau >/dev/null"

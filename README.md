@@ -66,6 +66,7 @@ Gambar juga dapat dibuka pada server lokal melalui `/pratinjau/mobile-nasabah.pn
 ## Dokumentasi
 
 - [Catatan serah terima untuk agen berikutnya](handoff.md)
+- [Deploy demo ke Tencent Lighthouse](deploy/README.md)
 - [Arsitektur, model data, aturan, dan alur](docs/phase1.md)
 - [API dan panduan menjalankan sistem](docs/runbook.md)
 

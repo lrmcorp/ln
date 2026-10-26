@@ -1,0 +1,9 @@
+:80 {
+  @preview path /pratinjau /pratinjau/* /_next/*
+  handle @preview {
+    reverse_proxy app:3000
+  }
+  handle {
+    respond "Halaman aplikasi memerlukan domain HTTPS." 403
+  }
+}
