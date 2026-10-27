@@ -12,6 +12,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -30,6 +31,7 @@ jobs:
     needs: validate
     if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - name: Check demo subdomain DNS
@@ -76,7 +78,7 @@ jobs:
           DNS_READY: ${{ steps.dns.outputs.ready }}
         run: |
           if [[ "$DNS_READY" == 'true' ]]; then
-            curl -fsSL --retry 20 --retry-delay 3 --retry-all-errors https://int.lnint.xyz/pratinjau >/dev/null
+            curl -fsSL --connect-timeout 5 --max-time 12 --retry 5 --retry-delay 3 --retry-all-errors https://int.lnint.xyz/pratinjau >/dev/null
           else
-            curl -fsSL --retry 10 --retry-delay 3 --retry-all-errors http://43.152.240.47/pratinjau >/dev/null
+            curl -fsSL --connect-timeout 5 --max-time 12 --retry 5 --retry-delay 3 --retry-all-errors http://43.152.240.47/pratinjau >/dev/null
           fi

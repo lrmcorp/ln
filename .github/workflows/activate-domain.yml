@@ -29,5 +29,10 @@ jobs:
             echo 'Demo HTTPS is already healthy; no deploy needed.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          active_runs="$(gh run list --workflow deploy-demo.yml --limit 20 --json status --jq '[.[] | select(.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "requested")] | length')"
+          if (( active_runs > 0 )); then
+            echo 'A demo deploy is already active; waiting for the next scheduled check.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           gh workflow run deploy-demo.yml --ref main
           echo 'DNS is ready and HTTPS is not healthy; dispatched the demo deploy.' >> "$GITHUB_STEP_SUMMARY"
