@@ -22,13 +22,12 @@ Jangan kirim kunci privat atau kata sandi melalui chat atau commit. Workflow han
 
 Proxy Caddy hanya membuka `http://43.152.240.47/pratinjau` beserta gambar dan berkas JavaScript/CSS yang diperlukan. Beranda, login, API, dan alur pinjaman mendapat HTTP 403. Ini mencegah pemakaian aplikasi melalui HTTP tanpa TLS. Lokasi browser dan APK Android memerlukan HTTPS sehingga belum dapat diuji dari IP ini.
 
-Saat domain sudah diarahkan ke IP server, ubah dua baris di `~/ln/.env.vps` melalui konsol server:
+## Subdomain demo HTTPS
 
-```text
-CADDYFILE=./Caddyfile.domain
-SITE_DOMAIN=nama-domain-anda.example
-```
+Gunakan **hanya** `int.lnint.xyz` untuk aplikasi. Di DNS `lnint.xyz`, buat record `A` dengan nama/host `int` dan nilai `43.152.240.47`. Jangan buat record `A` lain atau record `AAAA` untuk `int`. Domain utama `lnint.xyz` tidak dikonfigurasi di Caddy; biarkan record situs utamanya kosong jika ingin domain utama tidak menampilkan apa pun. Record DNS bawaan penyedia domain perlu diperiksa secara terpisah.
 
-Jalankan ulang workflow agar Caddy meminta sertifikat HTTPS secara otomatis. Pastikan DNS dan port 80/443 sudah siap. Aplikasi yang terbuka dengan domain masih **demo**, belum siap untuk pinjaman atau data nasabah nyata.
+Pada setiap deploy, GitHub Actions memeriksa apakah `int.lnint.xyz` hanya teresolusi ke IP VPS. Sebelum DNS siap, pratinjau HTTP di IP tetap berjalan. Setelah DNS siap, workflow mengubah dua pengaturan nonrahasia dalam `.env.vps` di VPS (`CADDYFILE` dan `SITE_DOMAIN`), menjalankan ulang Caddy, lalu menguji `https://int.lnint.xyz/pratinjau` dengan validasi sertifikat TLS. Jika DNS baru diubah setelah deploy terakhir, jalankan **Deploy demo to Tencent Lighthouse → Run workflow** di GitHub Actions. Port 80 dan 443 harus terbuka agar Caddy dapat memperoleh sertifikat.
+
+Aplikasi pada subdomain masih **demo**, belum siap untuk pinjaman atau data nasabah nyata. HTTPS yang valid memungkinkan pengujian login per peran dan izin lokasi pada perangkat, tetapi tidak menghilangkan batasan produk dan keamanan yang dijelaskan di README utama.
 
 Jika workflow gagal, lihat langkah yang gagal di GitHub Actions. Bila `sudo -n docker` gagal, periksa hak sudo pengguna `ubuntu` di konsol Tencent. Bila SSH gagal, periksa kunci yang di-bind, secret GitHub, dan aturan firewall. Jangan menonaktifkan pemeriksaan host key untuk memperbaiki koneksi.
