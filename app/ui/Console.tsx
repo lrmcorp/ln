@@ -1,8 +1,8 @@
 'use client';
-import {useEffect,useState,useTransition} from 'react';
+import {useEffect,useRef,useState,useTransition} from 'react';
 
 type Actor={id:string;name:string;email:string;role:'owner'|'officer'|'manager'};
-type Application={id:string;status:string;requested_principal:string;approved_principal:string|null;interest_amount:string|null;term_weeks:number|null;term_months:number|null;repayment_frequency:string;customer_name:string;officer_name:string;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;paid:string;transfer_reference:string|null;verification_status:string|null;signing_method:string|null;due_to_date:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:{id:string;amount:string;reference:string|null;createdAt:string;recordedBy:string;amountSource:'entered'|'read_confirmed'|'read_auto';hasReceipt:boolean}[]};
+type Application={id:string;status:string;requested_principal:string;approved_principal:string|null;interest_amount:string|null;term_weeks:number|null;term_months:number|null;repayment_frequency:string;customer_name:string;officer_name:string;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;paid:string;transfer_reference:string|null;verification_status:string|null;signing_method:string|null;overdue_through_yesterday:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:{id:string;amount:string;reference:string|null;createdAt:string;recordedBy:string;amountSource:'entered'|'read_confirmed'|'read_auto';hasReceipt:boolean}[]};
 type Data={today:string;applications:Application[];customers:{id:string;name:string}[];totals:{net_cash:string;principal_outstanding:string;interest_receivable:string}|null;policy:{version:number;min_principal:string;max_principal:string;flat_interest_bps:number;min_weeks:number;max_weeks:number;min_months:number;max_months:number;late_fee_monthly_bps:number;weekly_rates:{weeks:number;rateBps:number}[]}|null;counts:{pending:number;active:number}|null};
 const money=(value:string|number|null|undefined)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(value??0));
 const labels:Record<string,string>={submitted:'Menunggu keputusan',awaiting_signature:'Menunggu tanda tangan',signed_pending_approval:'Tanda tangan selesai, menunggu pemilik',approved:'Disetujui',signed:'Perjanjian ditandatangani',release_authorized:'Pencairan diizinkan',transfer_initiated:'Transfer dimulai',active:'Aktif',paid_off:'Lunas',closed:'Ditutup'};
@@ -11,7 +11,8 @@ const roleLabels:Record<Actor['role'],string>={owner:'Pemilik',officer:'Petugas'
 const demoNames:Record<string,string>={'Demo Owner':'Pemilik Demo','Demo Officer':'Petugas Demo','Demo Manager':'Manajer Demo','Demo Borrower':'Nasabah Demo'};
 const displayName=(name:string)=>demoNames[name]??name;
 const totalDue=(app:Application)=>app.snapshot?Number(app.snapshot.total):Number(app.approved_principal??0)+Number(app.interest_amount??0);
-const overdue=(app:Application)=>app.status==='active'&&Number(app.due_to_date)>Number(app.paid);
+// An installment is late only after its due date ends, matching the signed terms.
+const overdue=(app:Application)=>app.status==='active'&&Number(app.overdue_through_yesterday)>Number(app.paid);
 function nextStep(role:Actor['role'],status:string){
   if(status==='closed') return 'Pinjaman ditutup';
   if(role==='owner') return ownerSteps[status]??'Tinjau pinjaman';
@@ -106,15 +107,15 @@ function Repayment({app}:{app:Application}){
   const total=totalDue(app),paid=Number(app.paid);
   return <div className="repayment"><p><strong>{money(paid)}</strong> dari {money(total)} dibayar{paid<total&&` · sisa ${money(total-paid)}`}</p>
     <div className="repaymentBar" role="progressbar" aria-label="Kemajuan pembayaran" aria-valuemin={0} aria-valuemax={total} aria-valuenow={paid}><span style={{width:`${total?Math.min(100,paid/total*100):0}%`}}/></div>
-    {overdue(app)&&<p className="lateNote">Terlambat {money(Number(app.due_to_date)-paid)}</p>}</div>;
+    {overdue(app)&&<p className="lateNote">Terlambat {money(Number(app.overdue_through_yesterday)-paid)}</p>}</div>;
 }
 
 function Installments({app,today}:{app:Application;today:string}){
   let left=Number(app.paid);
   return <div className="schedule"><table><thead><tr><th>Angsuran</th><th>Jatuh tempo</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>{app.installments.map(item=>{
     const amount=Number(item.amount),covered=Math.min(amount,Math.max(0,left));left-=amount;
-    const state=covered>=amount?'Lunas':item.dueAt<=today?(covered?`Kurang ${money(amount-covered)}`:'Terlambat'):covered?`Sebagian ${money(covered)}`:'Belum jatuh tempo';
-    return <tr key={item.sequence} className={covered<amount&&item.dueAt<=today?'late':undefined}><td>Minggu ke-{item.sequence}</td><td>{new Date(`${item.dueAt}T12:00:00Z`).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</td><td>{money(amount)}</td><td>{state}</td></tr>;
+    const state=covered>=amount?'Lunas':item.dueAt<today?(covered?`Kurang ${money(amount-covered)}`:'Terlambat'):item.dueAt===today?(covered?`Kurang ${money(amount-covered)}, jatuh tempo hari ini`:'Jatuh tempo hari ini'):covered?`Sebagian ${money(covered)}`:'Belum jatuh tempo';
+    return <tr key={item.sequence} className={covered<amount&&item.dueAt<today?'late':undefined}><td>Minggu ke-{item.sequence}</td><td>{new Date(`${item.dueAt}T12:00:00Z`).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</td><td>{money(amount)}</td><td>{state}</td></tr>;
   })}</tbody></table></div>;
 }
 
@@ -123,8 +124,10 @@ function PaymentForm({app,pending,post}:{app:Application;pending:boolean;post:(p
   const [source,setSource]=useState<'entered'|'read_confirmed'>('entered');
   const [reading,setReading]=useState(false);
   const [readNote,setReadNote]=useState('');
+  const latestFile=useRef<File|null>(null);
   const remaining=totalDue(app)-Number(app.paid);
   async function readReceipt(file:File|undefined){
+    latestFile.current=file??null;
     setReadNote('');
     if(!file)return;
     if(file.type==='application/pdf'){setReadNote('PDF tidak dibaca otomatis. Isi nominal sesuai bukti.');return;}
@@ -134,11 +137,13 @@ function PaymentForm({app,pending,post}:{app:Application;pending:boolean;post:(p
       const body=new FormData();body.set('applicationId',app.id);body.set('receipt',file);
       const response=await fetch('/api/payments/read',{method:'POST',body});
       const result=await response.json();
+      if(latestFile.current!==file)return;
       if(!response.ok)throw new Error(result.error??'Bukti belum dapat dibaca');
-      if(result.amount){setAmount(String(result.amount));setSource('read_confirmed');setReadNote(`Terbaca dari bukti: "${result.line}". Periksa sebelum menyimpan.`);}
+      if(result.amount>remaining){setAmount('');setSource('entered');setReadNote(`Terbaca ${money(result.amount)} dari "${result.line}", melebihi sisa tagihan ${money(remaining)}. Isi nominal sesuai bukti.`);}
+      else if(result.amount){setAmount(String(result.amount));setSource('read_confirmed');setReadNote(`Terbaca dari bukti: "${result.line}". Periksa sebelum menyimpan.`);}
       else{setAmount('');setSource('entered');setReadNote('Nominal tidak terbaca. Isi nominal sesuai bukti.');}
-    }catch(cause){setReadNote(cause instanceof Error?cause.message:'Bukti belum dapat dibaca');}
-    finally{setReading(false);}
+    }catch(cause){if(latestFile.current===file)setReadNote(cause instanceof Error?cause.message:'Bukti belum dapat dibaca');}
+    finally{if(latestFile.current===file)setReading(false);}
   }
   let cumulative=0;
   const next=app.installments.map(item=>({sequence:item.sequence,through:cumulative+=Number(item.amount)})).find(item=>item.through>Number(app.paid));
@@ -173,8 +178,12 @@ function Case({app,role,today,pending,post}:{app:Application;role:Actor['role'];
   }
   const principal=Number(app.approved_principal??app.requested_principal);
   const total=totalDue(app);
+  let cumulative=0;
+  const upcoming=app.status==='active'?app.installments.find(item=>(cumulative+=Number(item.amount))>Number(app.paid)):undefined;
+  const nextDue=upcoming&&new Date(`${upcoming.dueAt}T12:00:00Z`).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'long'});
   const toggleLabel=open?'Sembunyikan detail':role==='owner'&&ownerSteps[app.status]?'Tinjau dan tindak':role!=='owner'&&app.status==='active'?'Catat pembayaran':'Lihat detail';
-  return <article className="case" id={`case-${app.id}`}><div className="caseTop"><div><span className="caseStatus">{labels[app.status]??app.status}</span><h3>{displayName(app.customer_name)}</h3><p>Diajukan oleh {displayName(app.officer_name)} · {new Date(app.submitted_at).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</p><p className="nextStep">{nextStep(role,app.status)}</p>{['active','paid_off'].includes(app.status)&&<Repayment app={app}/>}</div><div className="caseAmount"><strong>{money(principal)}</strong><button className="textButton" aria-expanded={open} aria-label={`${toggleLabel}: ${displayName(app.customer_name)}`} onClick={()=>setOpen(!open)}>{toggleLabel}</button></div></div>
+  return <article className="case" id={`case-${app.id}`}><div className="caseTop"><div><span className="caseStatus">{labels[app.status]??app.status}</span><h3>{displayName(app.customer_name)}</h3><p>Diajukan oleh {displayName(app.officer_name)} · {new Date(app.submitted_at).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</p><p className="nextStep">{nextDue?`Angsuran berikutnya ${nextDue}`:nextStep(role,app.status)}</p></div><div className="caseAmount"><strong>{money(principal)}</strong><button className="textButton" aria-expanded={open} aria-label={`${toggleLabel}: ${displayName(app.customer_name)}`} onClick={()=>setOpen(!open)}>{toggleLabel}</button></div></div>
+    {['active','paid_off'].includes(app.status)&&<Repayment app={app}/>}
     {open&&<div className="caseBody"><div className="facts"><div><small>Tenor</small><strong>{app.repayment_frequency==='monthly_first'?`${app.term_months} bulan`:`${app.term_weeks} minggu`}</strong></div><div><small>Total tagihan</small><strong>{app.snapshot?money(Number(app.snapshot.total)):app.approved_principal?money(total):'Menunggu tanda tangan'}</strong></div><div><small>Sudah dibayar</small><strong>{money(app.paid)}</strong></div><div><small>Referensi transfer</small><strong>{app.transfer_reference??'Belum dikonfirmasi'}</strong></div></div>
       {app.installments.length>0&&app.repayment_frequency==='weekly_from_approval'&&<Installments app={app} today={today}/>}
       {app.payments.length>0&&<div className="paymentList"><h4>Riwayat pembayaran</h4><ul>{app.payments.map(item=><li key={item.id}><span>{new Date(item.createdAt).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})} · {money(item.amount)}{item.reference&&` · Ref ${item.reference}`} · dicatat {displayName(item.recordedBy)}{item.amountSource==='read_auto'?' · nominal dibaca otomatis, periksa bukti':item.amountSource==='read_confirmed'?' · nominal dari bukti, dikonfirmasi':''}</span>{item.hasReceipt&&<a href={`/api/payments/${item.id}/receipt`} target="_blank" rel="noopener noreferrer">Lihat bukti</a>}</li>)}</ul></div>}

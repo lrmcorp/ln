@@ -10,7 +10,7 @@ export async function dashboard(actor:Actor){
       ie.verification_status,se.signing_method,
       COALESCE((SELECT SUM(p.amount)::bigint FROM payments p WHERE p.application_id=a.id),0) AS paid,
       d.bank_reference AS transfer_reference,
-      COALESCE((SELECT SUM(i.principal+i.interest)::bigint FROM installments i WHERE i.application_id=a.id AND i.due_at<=(now() AT TIME ZONE 'Asia/Jakarta')::date),0) AS due_to_date,
+      COALESCE((SELECT SUM(i.principal+i.interest)::bigint FROM installments i WHERE i.application_id=a.id AND i.due_at<(now() AT TIME ZONE 'Asia/Jakarta')::date),0) AS overdue_through_yesterday,
       COALESCE((SELECT json_agg(json_build_object('sequence',i.sequence,'dueAt',i.due_at,'amount',i.principal+i.interest) ORDER BY i.sequence) FROM installments i WHERE i.application_id=a.id),'[]') AS installments,
       COALESCE((SELECT json_agg(json_build_object('id',p.id,'amount',p.amount,'reference',p.bank_reference,'createdAt',p.created_at,'recordedBy',vu.name,'amountSource',p.amount_source,'hasReceipt',pr.payment_id IS NOT NULL) ORDER BY p.created_at)
         FROM payments p JOIN users vu ON vu.id=p.verified_by LEFT JOIN payment_receipts pr ON pr.payment_id=p.id WHERE p.application_id=a.id),'[]') AS payments
