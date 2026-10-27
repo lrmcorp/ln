@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {pool} from '../lib/db';
 import {hashPassword,type Actor} from '../lib/auth';
-import {perform} from '../lib/workflow';
+import {perform,recordPayment} from '../lib/workflow';
 import {activateMobileDevice,createMobileEnrollment,mobileDeviceStatus,reportMobileLocation,setMobileConsent} from '../lib/mobile-location';
 import {customerLocation,monitorLocations} from '../lib/location';
 
@@ -42,8 +42,8 @@ test('paired Android device reports only for an active consented loan and stops 
   await assert.rejects(reportMobileLocation(token,-6.175,106.827,12),/Location consent required/);
   await setMobileConsent(token,true);
   const balance=await pool.query('SELECT approved_principal,interest_amount FROM applications WHERE id=$1',[application.id]);
-  await perform(owner,{type:'payment',applicationId:application.id,bankReference:randomUUID(),
-    amount:Number(balance.rows[0].approved_principal)+Number(balance.rows[0].interest_amount)});
+  await recordPayment(owner,application.id,Number(balance.rows[0].approved_principal)+Number(balance.rows[0].interest_amount),null,
+    Buffer.concat([Buffer.from('%PDF-1.4\n'),Buffer.from(randomUUID())]));
   assert.equal((await customerLocation(customer)).enabled,false);
   await assert.rejects(mobileDeviceStatus(token),/Invalid device token/);
   await perform(owner,{type:'close',applicationId:application.id});

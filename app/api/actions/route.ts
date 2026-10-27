@@ -25,18 +25,18 @@ const errors:Record<string,string>={
   'Numeric bank reference and independent settlement proof required':'Referensi bank berupa angka dan bukti penyelesaian diperlukan',
   'A verified bank reconciliation adapter is required':'Layanan rekonsiliasi bank terverifikasi diperlukan',
   'Loan is not active':'Pinjaman belum aktif',
-  'Invalid payment':'Data pembayaran tidak valid',
-  'Overpayment requires review':'Pembayaran melebihi tagihan dan perlu ditinjau',
   'Ledger obligations must be paid off':'Seluruh kewajiban pembukuan harus lunas',
   'Invalid financial inputs':'Data keuangan tidak valid',
   'Amount exceeds safe range':'Jumlah melebihi batas yang didukung',
   'Unbalanced journal':'Catatan pembukuan tidak seimbang',
   'Identity review required':'Bukti identitas harus ditinjau pemilik sebelum persetujuan',
   'Identity review not allowed':'Bukti belum dapat ditinjau atau alasan kosong',
-  'Identity evidence missing':'Bukti identitas tidak ditemukan'
+  'Identity evidence missing':'Bukti identitas tidak ditemukan',
+  'Invalid weekly rates':'Tabel bunga mingguan tidak valid. Gunakan 1 sampai 52 minggu tanpa duplikat dan bunga 0 sampai 100%',
+  'Signed terms mismatch':'Syarat yang ditandatangani tidak cocok dengan pengajuan'
 };
 const schema=z.discriminatedUnion('type',[
-  z.object({type:z.literal('policy'),minPrincipal:z.number().int(),maxPrincipal:z.number().int(),flatInterestBps:z.number().int(),minWeeks:z.number().int(),maxWeeks:z.number().int(),minMonths:z.number().int().optional(),maxMonths:z.number().int().optional(),lateFeeMonthlyBps:z.number().int().optional()}),
+  z.object({type:z.literal('policy'),minPrincipal:z.number().int(),maxPrincipal:z.number().int(),flatInterestBps:z.number().int().optional(),minWeeks:z.number().int().optional(),maxWeeks:z.number().int().optional(),minMonths:z.number().int().optional(),maxMonths:z.number().int().optional(),lateFeeMonthlyBps:z.number().int().optional(),weeklyRates:z.array(z.object({weeks:z.number().int(),rateBps:z.number().int()})).min(1).max(20).optional()}),
   z.object({type:z.literal('customer'),name:z.string().min(1).max(200),nik:z.string().regex(/^[0-9]{16}$/),phone:z.string().min(8).max(20),bankName:z.string().min(1).max(100),accountNumber:z.string().regex(/^[0-9]{5,30}$/)}),
   z.object({type:z.literal('create'),customerId:uuid,principal:z.number().int().positive(),weeks:z.number().int().positive()}),
   z.object({type:z.literal('approve'),applicationId:uuid,reason:z.string().max(500).optional()}),
@@ -45,7 +45,6 @@ const schema=z.discriminatedUnion('type',[
   z.object({type:z.literal('authorize'),applicationId:uuid}),
   z.object({type:z.literal('initiate'),applicationId:uuid,idempotencyKey:z.string().min(1).max(100)}),
   z.object({type:z.literal('confirm'),applicationId:uuid,bankReference:z.string().regex(/^\d+$/),proof:z.string().min(1).max(500)}),
-  z.object({type:z.literal('payment'),applicationId:uuid,bankReference:z.string().min(1).max(100),amount:z.number().int().positive()}),
   z.object({type:z.literal('close'),applicationId:uuid})
 ]);
 export async function POST(request:Request){

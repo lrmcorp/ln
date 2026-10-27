@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {pool} from '../lib/db';
-import {perform} from '../lib/workflow';
+import {perform,recordPayment} from '../lib/workflow';
 import type {Actor} from '../lib/auth';
 import {hashPassword} from '../lib/auth';
 import {customerLocation,monitorLocations,reportLocation,setLocationConsent} from '../lib/location';
+
+const receipt=()=>Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.from(randomUUID())]);
 
 test('demo application passes role, signature, transfer, repayment, and ledger controls',async()=>{
   const users=await pool.query<Actor>('SELECT id,name,email,role,branch_id,customer_id FROM users WHERE email IN ($1,$2,$3)',
@@ -29,9 +31,11 @@ test('demo application passes role, signature, transfer, repayment, and ledger c
   await assert.rejects(perform(officer,{type:'confirm',applicationId:id,bankReference:'000123',proof:'demo settlement'}),/Forbidden/);
   await perform(owner,{type:'confirm',applicationId:id,bankReference:`000${Date.now()}${Math.floor(Math.random()*1000)}`,proof:'Demo bank settlement evidence'});
   const paymentRef=`PAY-${randomUUID()}`;
-  await perform(owner,{type:'payment',applicationId:id,bankReference:paymentRef,amount:100000});
-  await assert.rejects(perform(owner,{type:'payment',applicationId:id,bankReference:paymentRef,amount:100000}),/duplicate key/);
-  await perform(owner,{type:'payment',applicationId:id,bankReference:randomUUID(),amount:410000});
+  await recordPayment(owner,id,100000,paymentRef,receipt());
+  await assert.rejects(recordPayment(owner,id,100000,paymentRef,receipt()),/duplicate key/);
+  await assert.rejects(recordPayment(officer,id,100000,null,receipt()),/Forbidden/);
+  await assert.rejects(recordPayment(owner,id,100000,null,Buffer.from('not a receipt file')),/Invalid receipt/);
+  await recordPayment(owner,id,410000,null,receipt());
   await perform(owner,{type:'close',applicationId:id});
   const result=await pool.query('SELECT status FROM applications WHERE id=$1',[id]);
   assert.equal(result.rows[0].status,'closed');
@@ -85,7 +89,7 @@ test('location sharing requires active loan and consent, excludes field staff, a
   await assert.rejects(reportLocation(customer,-6.175,106.827,12),/Location consent required/);
   await setLocationConsent(customer,true);
   await reportLocation(customer,-6.175,106.827,12);
-  await perform(owner,{type:'payment',applicationId:application.id,bankReference:randomUUID(),amount:306000});
+  await recordPayment(owner,application.id,306000,null,receipt());
   const stopped=await customerLocation(customer);
   assert.equal(stopped.active,false);
   assert.equal(stopped.enabled,false);

@@ -1,5 +1,9 @@
 # Product and technical design
 
+## Weekly repayment update (2026-10-27)
+
+This supersedes the monthly schedule below. New intake is weekly: the officer picks a tenor from the policy's weekly rate table (default 4 weeks 20%, 5 weeks 25%, 6 weeks 30%; the owner can edit, add, or remove rows, 1 to 52 weeks and 0 to 100%). Interest is `round_half_up(principal × rate)` on top of principal; principal and interest are split evenly across weeks with remainders on the earliest weeks. The borrower signs the amounts and the rule "first installment 7 days after owner approval, then every 7 days"; owner approval creates the dated installments and checks that they match the signed amounts. The branch manager (or owner) records each repayment with a required JPG/PNG/PDF receipt (encrypted, SHA-256 unique) and an optional reference. Payments still allocate interest first in the ledger; the UI shows paid versus total due, remaining amount, per-week status, and arrears through today's Jakarta date. Late fees remain described but not accrued. Older monthly applications keep their monthly terms.
+
 ## Current monthly intake update (2026-10-25)
 
 The latest user direction supersedes the older weekly example and customer-signing sequence below. The field officer now starts a three-step mobile intake: identity and encrypted KTP/video evidence, monthly amount and schedule, then borrower review and demo signature on the officer's device. A related customer account may open the separate signing page; newly created borrowers do not receive their own login yet. The customer home is blank; the separate `/izin-lokasi` route holds the explicit opt-in/withdrawal controls. Previously consented reporting still runs when the blank page is open. The owner manually reviews evidence and approves only the exact signed terms snapshot before release. A changed agreement requires a new version and signature, but that revision flow is not yet built. Monthly installments begin on the 1st of the month after signing, with principal and total flat interest split across months. Terms show a simple late fee at the policy's monthly rate, initially 5% of original principal, prorated daily with a fixed 30-day divisor after the due date. Fee accrual and payment allocation are not yet implemented, so the demo ledger does not enforce that term. The old weekly route remains for compatibility and tests; it is not the primary UI flow.
@@ -60,9 +64,11 @@ The schema is in `db/schema.sql`. Customer NIK is reduced to a keyed duplicate-d
 | Approve application | Yes | No | No | No |
 | Simulate signature through internal API | No | No | No | Yes; no customer UI |
 | Authorize, initiate, confirm transfer | Yes | No | No | No |
-| Verify repayment and close | Yes | No | No | No |
+| Record repayment with receipt | Yes | Own branch | No | No |
+| View payment receipt | Yes | Own branch | No | No |
+| Close paid-off loan | Yes | No | No | No |
 
-The API enforces this matrix. The manager role has branch-scoped location read access and no financial actions. The owner role is not yet protected by MFA or high-assurance step-up, so it is a development role only.
+The API enforces this matrix. The manager role has branch-scoped location read access and records branch repayments with receipts; it has no approval, disbursement, or closure actions. The owner role is not yet protected by MFA or high-assurance step-up, so it is a development role only.
 
 ## State transitions
 

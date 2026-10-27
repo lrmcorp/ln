@@ -1,13 +1,13 @@
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
 import {currentActor} from '@/lib/auth';
-import {createMonthlyIntake} from '@/lib/intake';
+import {createIntake} from '@/lib/intake';
 
 const details=z.object({
   name:z.string().trim().min(1).max(200),nik:z.string().regex(/^\d{16}$/),dateOfBirth:z.iso.date(),
   phone:z.string().min(8).max(20),address:z.string().trim().min(1).max(500),motherName:z.string().trim().min(1).max(200),
   bankName:z.string().trim().min(1).max(100),bankAccountNumber:z.string().regex(/^\d{5,30}$/),accountHolder:z.string().trim().min(1).max(200),
-  occupation:z.string().max(200),loanPurpose:z.string().max(300),principal:z.number().int().positive(),months:z.number().int().positive()
+  occupation:z.string().max(200),loanPurpose:z.string().max(300),principal:z.number().int().positive(),weeks:z.number().int().positive()
 });
 
 export async function POST(request:Request){
@@ -23,8 +23,8 @@ export async function POST(request:Request){
     const input=details.parse({name:form.get('name'),nik:form.get('nik'),dateOfBirth:form.get('dateOfBirth'),phone:form.get('phone'),
       address:form.get('address'),motherName:form.get('motherName'),bankName:form.get('bankName'),bankAccountNumber:form.get('bankAccountNumber'),
       accountHolder:form.get('accountHolder'),occupation:form.get('occupation')??'',loanPurpose:form.get('loanPurpose')??'',
-      principal:Number(form.get('principal')),months:Number(form.get('months'))});
-    const result=await createMonthlyIntake(actor,input,new Uint8Array(await ktp.arrayBuffer()),new Uint8Array(await liveness.arrayBuffer()));
+      principal:Number(form.get('principal')),weeks:Number(form.get('weeks'))});
+    const result=await createIntake(actor,input,new Uint8Array(await ktp.arrayBuffer()),new Uint8Array(await liveness.arrayBuffer()));
     return NextResponse.json(result,{status:201});
   }catch(error){
     const message=error instanceof Error?error.message:'';

@@ -9,7 +9,9 @@ Routes accept JSON except `/api/intake`, which accepts multipart form data. Staf
 | `POST /api/login` | `{email,password}` | Session cookie |
 | `POST /api/logout` | `{}` | Clears cookie |
 | `POST /api/actions` | Discriminated action object below | New ID, version, receipt or allocation |
-| `POST /api/intake` | Officer multipart identity, KTP photo, liveness video, principal, months | New monthly application ID |
+| `POST /api/intake` | Officer multipart identity, KTP photo, liveness video, principal, weeks (must match a policy tenor) | New weekly application ID |
+| `POST /api/payments` | Owner or branch manager multipart: `applicationId`, integer IDR `amount`, optional `reference`, `receipt` (JPG/PNG/PDF, max 5 MB) | Payment ID, allocation, remaining balance |
+| `GET /api/payments/{paymentId}/receipt` | Owner or same-branch manager session | Audited encrypted receipt retrieval |
 | `POST /api/signing` | Related customer or assigned officer: application ID, name, acceptance, displayed terms hash, signature PNG data URL | Signed agreement hash |
 | `GET /api/evidence/{applicationId}/{ktp\|liveness}` | Owner or assigned officer session | Audited encrypted evidence retrieval |
 | `GET /api/location` | Session cookie | Own status for customer; scoped latest reports for owner/manager; officer denied |
@@ -28,7 +30,7 @@ Routes accept JSON except `/api/intake`, which accepts multipart form data. Staf
 - `approve`, `sign`, `authorize`, `close`: `applicationId` (`approve`, `authorize`, `close` owner; `sign` related customer).
 - `initiate`: `applicationId`, `idempotencyKey` (owner). Replaying the same key returns `replayed:true`.
 - `confirm`: `applicationId`, numeric-string `bankReference`, `proof` (owner, demo adapter only). The string preserves leading zeros.
-- `payment`: `applicationId`, unique `bankReference`, integer IDR `amount` (owner).
+- `policy` also accepts `weeklyRates`: `[{weeks,rateBps}]`, 1 to 20 unique rows. Repayments moved to `POST /api/payments` because each needs a receipt file.
 
 The server-rendered dashboard currently supplies reads. Before Flutter, add stable versioned read endpoints, pagination, idempotency contracts, and OpenAPI generation.
 

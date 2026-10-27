@@ -1,7 +1,7 @@
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
 import {currentActor} from '@/lib/auth';
-import {signMonthlyApplication} from '@/lib/intake';
+import {signApplication} from '@/lib/intake';
 
 const schema=z.object({applicationId:z.uuid(),signerName:z.string().min(1).max(200),accepted:z.literal(true),
   termsHash:z.string().regex(/^[0-9a-f]{64}$/),signatureDataUrl:z.string().startsWith('data:image/png;base64,').max(700000)});
@@ -15,7 +15,7 @@ export async function POST(request:Request){
   try{
     const body=schema.parse(await request.json());
     const signature=Buffer.from(body.signatureDataUrl.slice('data:image/png;base64,'.length),'base64');
-    const result=await signMonthlyApplication(actor,body.applicationId,body.signerName,body.accepted,body.termsHash,signature);
+    const result=await signApplication(actor,body.applicationId,body.signerName,body.accepted,body.termsHash,signature);
     return NextResponse.json(result);
   }catch(error){
     const message=error instanceof Error?error.message:'';

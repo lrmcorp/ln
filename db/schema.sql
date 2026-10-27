@@ -45,10 +45,11 @@ ALTER TABLE applications ADD COLUMN IF NOT EXISTS term_months integer;
 ALTER TABLE applications ADD COLUMN IF NOT EXISTS repayment_frequency text NOT NULL DEFAULT 'weekly';
 ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check;
 ALTER TABLE applications ADD CONSTRAINT applications_status_check CHECK (status IN ('submitted','awaiting_signature','signed_pending_approval','rejected','approved','signed','release_authorized','transfer_initiated','active','paid_off','closed'));
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS weekly_rates jsonb NOT NULL DEFAULT '[{"weeks":4,"rateBps":2000},{"weeks":5,"rateBps":2500},{"weeks":6,"rateBps":3000}]';
 ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_repayment_frequency_check;
-ALTER TABLE applications ADD CONSTRAINT applications_repayment_frequency_check CHECK (repayment_frequency IN ('weekly','monthly_first'));
+ALTER TABLE applications ADD CONSTRAINT applications_repayment_frequency_check CHECK (repayment_frequency IN ('weekly','monthly_first','weekly_from_approval'));
 ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_term_check;
-ALTER TABLE applications ADD CONSTRAINT applications_term_check CHECK ((repayment_frequency='weekly' AND term_weeks IS NOT NULL) OR (repayment_frequency='monthly_first' AND term_months IS NOT NULL));
+ALTER TABLE applications ADD CONSTRAINT applications_term_check CHECK ((repayment_frequency IN ('weekly','weekly_from_approval') AND term_weeks IS NOT NULL) OR (repayment_frequency='monthly_first' AND term_months IS NOT NULL));
 CREATE TABLE IF NOT EXISTS agreements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL REFERENCES applications(id),
   version integer NOT NULL, snapshot jsonb NOT NULL, snapshot_hash text NOT NULL,
@@ -86,6 +87,13 @@ CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL REFERENCES applications(id),
   bank_reference text UNIQUE NOT NULL, amount bigint NOT NULL CHECK (amount > 0),
   principal bigint NOT NULL, interest bigint NOT NULL, verified_by uuid NOT NULL REFERENCES users(id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE payments ALTER COLUMN bank_reference DROP NOT NULL;
+CREATE TABLE IF NOT EXISTS payment_receipts (
+  payment_id uuid PRIMARY KEY REFERENCES payments(id),
+  receipt_cipher bytea NOT NULL, receipt_iv bytea NOT NULL, receipt_tag bytea NOT NULL,
+  receipt_mime text NOT NULL, receipt_sha256 text UNIQUE NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS journals (
