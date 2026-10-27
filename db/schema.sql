@@ -90,6 +90,9 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE payments ALTER COLUMN bank_reference DROP NOT NULL;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS amount_source text NOT NULL DEFAULT 'entered';
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_amount_source_check;
+ALTER TABLE payments ADD CONSTRAINT payments_amount_source_check CHECK (amount_source IN ('entered','read_confirmed','read_auto'));
 CREATE TABLE IF NOT EXISTS payment_receipts (
   payment_id uuid PRIMARY KEY REFERENCES payments(id),
   receipt_cipher bytea NOT NULL, receipt_iv bytea NOT NULL, receipt_tag bytea NOT NULL,

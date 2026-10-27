@@ -14,10 +14,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/ind": "1.0.0",
     "next": "16.4.3",
     "pg": "8.16.3",
     "react": "19.1.1",
     "react-dom": "19.1.1",
+    "tesseract.js": "7.0.0",
     "zod": "4.6.7"
   },
   "devDependencies": {

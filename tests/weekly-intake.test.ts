@@ -1,16 +1,20 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {pool} from '../lib/db';
 import type {Actor} from '../lib/auth';
 import {createIntake,signApplication,signingPreview} from '../lib/intake';
 import {readIntakeEvidence} from '../lib/evidence';
 import {perform,readPaymentReceipt,recordPayment} from '../lib/workflow';
 import {jakartaToday} from '../lib/finance';
+import {stopReceiptReader} from '../lib/receipt-reader';
+
+after(stopReceiptReader);
 
 const receipt=()=>Buffer.concat([Buffer.from([255,216,255]),Buffer.from(randomUUID()),Buffer.from([255,217])]);
 
-test('weekly intake starts installments at approval and branch manager records receipted payments',async()=>{
+test('weekly intake starts installments at approval and staff record receipted payments',async()=>{
   const users=await pool.query<Actor>('SELECT id,name,email,role,branch_id,customer_id FROM users WHERE email IN ($1,$2,$3)',
     ['owner@local.test','officer@local.test','manager@local.test']);
   const owner=users.rows.find(item=>item.role==='owner')!,officer=users.rows.find(item=>item.role==='officer')!,manager=users.rows.find(item=>item.role==='manager')!;
@@ -51,7 +55,15 @@ test('weekly intake starts installments at approval and branch manager records r
   await assert.rejects(readPaymentReceipt({...manager,branch_id:randomUUID()},paid.paymentId),/Forbidden/);
   assert.deepEqual((await readPaymentReceipt(manager,paid.paymentId)).data,first);
   await assert.rejects(recordPayment(manager,id,525001,null,receipt()),/Overpayment/);
-  await recordPayment(manager,id,525000,`TRF-${randomUUID()}`,receipt());
+  // Field officer: blank nominal is read from the receipt photo (trailing bytes keep each run's receipt hash unique).
+  const photo=Buffer.concat([readFileSync(new URL('./fixtures/receipt-kwitansi.png',import.meta.url)),Buffer.from(randomUUID())]);
+  await assert.rejects(recordPayment({...officer,id:randomUUID()},id,null,null,photo),/Unassigned application/);
+  await assert.rejects(recordPayment(officer,id,null,null,Buffer.concat([Buffer.from('%PDF-1.4\n'),Buffer.from(randomUUID())])),/Receipt amount unreadable/);
+  const auto=await recordPayment(officer,id,null,null,photo);
+  assert.equal(auto.amount,125000);
+  assert.equal(auto.amountSource,'read_auto');
+  assert.deepEqual((await readPaymentReceipt(officer,auto.paymentId)).data,photo);
+  await recordPayment(officer,id,400000,`TRF-${randomUUID()}`,receipt(),'read_confirmed');
   assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'paid_off');
   await assert.rejects(perform(manager,{type:'close',applicationId:id}),/Forbidden/);
   await perform(owner,{type:'close',applicationId:id});

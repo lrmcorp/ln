@@ -33,7 +33,7 @@ test('demo application passes role, signature, transfer, repayment, and ledger c
   const paymentRef=`PAY-${randomUUID()}`;
   await recordPayment(owner,id,100000,paymentRef,receipt());
   await assert.rejects(recordPayment(owner,id,100000,paymentRef,receipt()),/duplicate key/);
-  await assert.rejects(recordPayment(officer,id,100000,null,receipt()),/Forbidden/);
+  await assert.rejects(recordPayment(customer,id,100000,null,receipt()),/Forbidden/);
   await assert.rejects(recordPayment(owner,id,100000,null,Buffer.from('not a receipt file')),/Invalid receipt/);
   await recordPayment(owner,id,410000,null,receipt());
   await perform(owner,{type:'close',applicationId:id});

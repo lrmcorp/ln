@@ -10,8 +10,9 @@ Routes accept JSON except `/api/intake`, which accepts multipart form data. Staf
 | `POST /api/logout` | `{}` | Clears cookie |
 | `POST /api/actions` | Discriminated action object below | New ID, version, receipt or allocation |
 | `POST /api/intake` | Officer multipart identity, KTP photo, liveness video, principal, weeks (must match a policy tenor) | New weekly application ID |
-| `POST /api/payments` | Owner or branch manager multipart: `applicationId`, integer IDR `amount`, optional `reference`, `receipt` (JPG/PNG/PDF, max 5 MB) | Payment ID, allocation, remaining balance |
-| `GET /api/payments/{paymentId}/receipt` | Owner or same-branch manager session | Audited encrypted receipt retrieval |
+| `POST /api/payments/read` | Owner, branch manager, or assigned officer multipart: `applicationId`, `receipt` image | `{amount,line}` read by OCR, or `{amount:null}`; stores nothing |
+| `POST /api/payments` | Owner, branch manager, or assigned officer multipart: `applicationId`, optional integer IDR `amount` (blank = read from receipt), optional `reference`, `amountSource` (`entered`/`read_confirmed`), `receipt` (JPG/PNG/PDF, max 5 MB) | Payment ID, amount, amount source, allocation, remaining balance |
+| `GET /api/payments/{paymentId}/receipt` | Owner, same-branch manager, or assigned officer session | Audited encrypted receipt retrieval |
 | `POST /api/signing` | Related customer or assigned officer: application ID, name, acceptance, displayed terms hash, signature PNG data URL | Signed agreement hash |
 | `GET /api/evidence/{applicationId}/{ktp\|liveness}` | Owner or assigned officer session | Audited encrypted evidence retrieval |
 | `GET /api/location` | Session cookie | Own status for customer; scoped latest reports for owner/manager; officer denied |

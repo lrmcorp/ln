@@ -6,6 +6,7 @@ import {requireRole} from './auth';
 import {allocatePayment, assertBalanced, calculateFlatSchedule, canonicalJson, jakartaToday} from './finance';
 import {imageMime,protect,reveal} from './protected-data';
 import {normalizeWeeklyRates} from './terms';
+import {readReceiptAmount} from './receipt-reader';
 
 type Action =
  | {type:'policy';minPrincipal:number;maxPrincipal:number;flatInterestBps?:number;minWeeks?:number;maxWeeks?:number;minMonths?:number;maxMonths?:number;lateFeeMonthlyBps?:number;weeklyRates?:{weeks:number;rateBps:number}[]}
@@ -65,7 +66,7 @@ export async function perform(actor:Actor|null, action:Action){
       const lateFeeMonthlyBps=action.lateFeeMonthlyBps??previous?.late_fee_monthly_bps??500;
       const weeklyRates=normalizeWeeklyRates(action.weeklyRates??previous?.weekly_rates??[{weeks:4,rateBps:2000},{weeks:5,rateBps:2500},{weeks:6,rateBps:3000}]);
       const flatInterestBps=action.flatInterestBps??previous?.flat_interest_bps??0;
-      const minWeeks=action.minWeeks??weeklyRates[0].weeks,maxWeeks=action.maxWeeks??weeklyRates[weeklyRates.length-1].weeks;
+      const minWeeks=action.minWeeks??previous?.min_weeks??1,maxWeeks=action.maxWeeks??previous?.max_weeks??52;
       if(![action.minPrincipal,action.maxPrincipal,flatInterestBps,minWeeks,maxWeeks,minMonths,maxMonths,lateFeeMonthlyBps].every(Number.isSafeInteger)||
         action.minPrincipal<=0||action.maxPrincipal<action.minPrincipal||action.maxPrincipal>1000000000||
         flatInterestBps<0||flatInterestBps>10000||minWeeks<1||maxWeeks<minWeeks||maxWeeks>260||
@@ -213,13 +214,42 @@ export function receiptMime(data:Uint8Array){
   return imageMime(data);
 }
 
-// Every repayment needs the uploaded receipt; the reference number is optional because many receipts lack one.
-export async function recordPayment(actor:Actor|null,applicationId:string,amount:number,reference:string|null,receipt:Uint8Array){
-  requireRole(actor,['owner','manager']);
-  if(!Number.isSafeInteger(amount)||amount<=0||(reference!==null&&(!reference.trim()||reference.length>100))) throw new Error('Invalid payment');
-  if(receipt.length<12||receipt.length>maxReceiptBytes) throw new Error('Invalid receipt');
-  const mime=receiptMime(receipt);
+export type AmountSource='entered'|'read_confirmed'|'read_auto';
+
+function validReceipt(receipt:Uint8Array){
+  const mime=receipt.length>=12&&receipt.length<=maxReceiptBytes?receiptMime(receipt):null;
   if(!mime) throw new Error('Invalid receipt');
+  return mime;
+}
+
+export async function assertCanRecordPayment(actor:Actor|null,applicationId:string){
+  requireRole(actor,['owner','manager','officer']);
+  const app=(await pool.query('SELECT officer_id,branch_id,customer_id,status FROM applications WHERE id=$1',[applicationId])).rows[0];
+  if(!app) throw new Error('Application not found');
+  inScope(actor,app);
+  if(app.status!=='active') throw new Error('Loan is not active');
+}
+
+// Reads a suggested amount for the form; nothing is stored.
+export async function readReceiptForPayment(actor:Actor|null,applicationId:string,receipt:Uint8Array){
+  await assertCanRecordPayment(actor,applicationId);
+  if(validReceipt(receipt)==='application/pdf') return null;
+  return readReceiptAmount(receipt);
+}
+
+// Every repayment needs the uploaded receipt; the reference number is optional because many receipts lack one.
+// With no amount, the receipt image is read and the payment is marked read_auto so the owner can check it.
+export async function recordPayment(actor:Actor|null,applicationId:string,amount:number|null,reference:string|null,receipt:Uint8Array,source:AmountSource='entered'){
+  requireRole(actor,['owner','manager','officer']);
+  if((amount!==null&&(!Number.isSafeInteger(amount)||amount<=0))||(reference!==null&&(!reference.trim()||reference.length>100))) throw new Error('Invalid payment');
+  const mime=validReceipt(receipt);
+  if(amount===null){
+    await assertCanRecordPayment(actor,applicationId);
+    const read=mime==='application/pdf'?null:await readReceiptAmount(receipt);
+    if(!read) throw new Error('Receipt amount unreadable');
+    amount=read.amount;source='read_auto';
+  }
+  const paid=amount;
   return transaction(async c=>{
     const app=await locked(c,applicationId);
     inScope(actor,app);
@@ -229,29 +259,30 @@ export async function recordPayment(actor:Actor|null,applicationId:string,amount
       AND l.account IN ('principal_receivable','interest_receivable') GROUP BY l.account`,[app.id]);
     const principal=Number(balances.rows.find(r=>r.account==='principal_receivable')?.balance??0);
     const interest=Number(balances.rows.find(r=>r.account==='interest_receivable')?.balance??0);
-    const allocation=allocatePayment(amount,principal,interest);
+    const allocation=allocatePayment(paid,principal,interest);
     const ref=reference?.trim()||null;
-    const p=await c.query('INSERT INTO payments(application_id,bank_reference,amount,principal,interest,verified_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',
-      [app.id,ref,amount,allocation.principal,allocation.interest,actor.id]);
+    const p=await c.query('INSERT INTO payments(application_id,bank_reference,amount,principal,interest,verified_by,amount_source) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+      [app.id,ref,paid,allocation.principal,allocation.interest,actor.id,source]);
     const file=protect(receipt);
     await c.query('INSERT INTO payment_receipts(payment_id,receipt_cipher,receipt_iv,receipt_tag,receipt_mime,receipt_sha256) VALUES($1,$2,$3,$4,$5,$6)',
       [p.rows[0].id,file.cipher,file.iv,file.tag,mime,file.sha256]);
     await journal(c,app.id,'payment',p.rows[0].id,[
-      {account:'cash',debit:amount,credit:0},
+      {account:'cash',debit:paid,credit:0},
       {account:'principal_receivable',debit:0,credit:allocation.principal},
       {account:'interest_receivable',debit:0,credit:allocation.interest}
     ]);
-    if(amount===principal+interest) await setStatus(c,actor,app,'paid_off');
-    await audit(c,actor,app.id,'payment',null,{paymentId:p.rows[0].id,amount,...allocation,reference:ref,receiptSha256:file.sha256});
-    return {id:app.id,paymentId:p.rows[0].id,allocation,remaining:principal+interest-amount};
+    if(paid===principal+interest) await setStatus(c,actor,app,'paid_off');
+    await audit(c,actor,app.id,'payment',null,{paymentId:p.rows[0].id,amount:paid,amountSource:source,...allocation,reference:ref,receiptSha256:file.sha256});
+    return {id:app.id,paymentId:p.rows[0].id,amount:paid,amountSource:source,allocation,remaining:principal+interest-paid};
   });
 }
 
 export async function readPaymentReceipt(actor:Actor|null,paymentId:string){
-  requireRole(actor,['owner','manager']);
-  const row=(await pool.query(`SELECT a.branch_id,r.* FROM payment_receipts r JOIN payments p ON p.id=r.payment_id
+  requireRole(actor,['owner','manager','officer']);
+  const row=(await pool.query(`SELECT a.branch_id,a.officer_id,a.customer_id,r.* FROM payment_receipts r JOIN payments p ON p.id=r.payment_id
     JOIN applications a ON a.id=p.application_id WHERE r.payment_id=$1`,[paymentId])).rows[0];
-  if(!row||(actor.role==='manager'&&row.branch_id!==actor.branch_id)) throw new Error('Forbidden');
+  if(!row) throw new Error('Forbidden');
+  try{inScope(actor,row);}catch{throw new Error('Forbidden');}
   await pool.query('INSERT INTO audit_events(actor_id,subject_type,subject_id,action) VALUES($1,$2,$3,$4)',[actor.id,'payment',paymentId,'receipt_viewed']);
   return {data:reveal(row.receipt_cipher,row.receipt_iv,row.receipt_tag),mime:row.receipt_mime as string};
 }

@@ -2,7 +2,7 @@
 
 ## Weekly repayment update (2026-10-27)
 
-This supersedes the monthly schedule below. New intake is weekly: the officer picks a tenor from the policy's weekly rate table (default 4 weeks 20%, 5 weeks 25%, 6 weeks 30%; the owner can edit, add, or remove rows, 1 to 52 weeks and 0 to 100%). Interest is `round_half_up(principal × rate)` on top of principal; principal and interest are split evenly across weeks with remainders on the earliest weeks. The borrower signs the amounts and the rule "first installment 7 days after owner approval, then every 7 days"; owner approval creates the dated installments and checks that they match the signed amounts. The branch manager (or owner) records each repayment with a required JPG/PNG/PDF receipt (encrypted, SHA-256 unique) and an optional reference. Payments still allocate interest first in the ledger; the UI shows paid versus total due, remaining amount, per-week status, and arrears through today's Jakarta date. Late fees remain described but not accrued. Older monthly applications keep their monthly terms.
+This supersedes the monthly schedule below. New intake is weekly: the officer picks a tenor from the policy's weekly rate table (default 4 weeks 20%, 5 weeks 25%, 6 weeks 30%; the owner can edit, add, or remove rows, 1 to 52 weeks and 0 to 100%). Interest is `round_half_up(principal × rate)` on top of principal; principal and interest are split evenly across weeks with remainders on the earliest weeks. The borrower signs the amounts and the rule "first installment 7 days after owner approval, then every 7 days"; owner approval creates the dated installments and checks that they match the signed amounts. The assigned field officer, branch manager, or owner records each repayment with a required JPG/PNG/PDF receipt (encrypted, SHA-256 unique) and an optional reference. The amount is optional: `lib/receipt-reader.ts` runs tesseract.js on the server (Indonesian and English models from npm, no network) and picks the labelled, currency-marked figure while skipping fees, balances, references, and dates. The form pre-fills the read amount for confirmation (`read_confirmed`); a blank amount at save is read server-side and stored as `read_auto` for owner review. PDFs are never read. Payments still allocate interest first in the ledger; the UI shows paid versus total due, remaining amount, per-week status, and arrears through today's Jakarta date. Late fees remain described but not accrued. Older monthly applications keep their monthly terms.
 
 ## Current monthly intake update (2026-10-25)
 
@@ -64,8 +64,8 @@ The schema is in `db/schema.sql`. Customer NIK is reduced to a keyed duplicate-d
 | Approve application | Yes | No | No | No |
 | Simulate signature through internal API | No | No | No | Yes; no customer UI |
 | Authorize, initiate, confirm transfer | Yes | No | No | No |
-| Record repayment with receipt | Yes | Own branch | No | No |
-| View payment receipt | Yes | Own branch | No | No |
+| Record repayment with receipt | Yes | Own branch | Own assigned loans | No |
+| View payment receipt | Yes | Own branch | Own assigned loans | No |
 | Close paid-off loan | Yes | No | No | No |
 
 The API enforces this matrix. The manager role has branch-scoped location read access and records branch repayments with receipts; it has no approval, disbursement, or closure actions. The owner role is not yet protected by MFA or high-assurance step-up, so it is a development role only.
