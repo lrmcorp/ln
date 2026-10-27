@@ -1,0 +1,32 @@
+name: Activate demo HTTPS when DNS is ready
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  check:
+    if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch deploy only when HTTPS needs activation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          addresses="$(getent ahostsv4 int.lnint.xyz | awk '{print $1}' | sort -u || true)"
+          ipv6_addresses="$(getent ahostsv6 int.lnint.xyz | awk '{print $1}' | sort -u || true)"
+          if [[ "$addresses" != '43.152.240.47' || -n "$ipv6_addresses" ]]; then
+            echo 'Subdomain DNS is not ready; will check again on the next schedule.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if curl -fsSL --max-time 15 --retry 2 --retry-delay 2 https://int.lnint.xyz/pratinjau -o /dev/null; then
+            echo 'Demo HTTPS is already healthy; no deploy needed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh workflow run deploy-demo.yml --ref main
+          echo 'DNS is ready and HTTPS is not healthy; dispatched the demo deploy.' >> "$GITHUB_STEP_SUMMARY"
