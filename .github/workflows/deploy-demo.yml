@@ -35,12 +35,11 @@ jobs:
       - name: Prepare pinned SSH identity
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
         run: |
-          test -n "$VPS_SSH_KEY" && test -n "$VPS_HOST_KEY"
+          test -n "$VPS_SSH_KEY"
           install -m 700 -d "$HOME/.ssh"
           printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/ln_vps"
-          printf '%s\n' "$VPS_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          cp deploy/known_hosts "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/ln_vps" "$HOME/.ssh/known_hosts"
           ssh-keygen -F 43.152.240.47 -f "$HOME/.ssh/known_hosts" >/dev/null
       - name: Upload exact commit

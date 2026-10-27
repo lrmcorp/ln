@@ -5,16 +5,15 @@ Target yang diketahui: Ubuntu 24.04 dengan Docker 29, IP `43.152.240.47`, penggu
 ## Hubungkan SSH ke GitHub Actions
 
 1. Di Tencent Lighthouse, buka tab **SSH Keys**, buat kunci baru jika belum ada, lalu **Bind** ke instance ini. Simpan berkas kunci privat yang diunduh di tempat aman. Tencent mungkin meminta restart instance saat mengikat kunci.
-2. Masuk lewat **Login via VNC** di Tencent dan ambil host key publik dari server:
+2. Host key publik server sudah diambil melalui terminal Tencent dan disimpan di `deploy/known_hosts`. Jika VPS dibangun ulang, perbarui file itu dari konsol Tencent dengan:
 
    ```bash
    printf '43.152.240.47 '; sudo cat /etc/ssh/ssh_host_ed25519_key.pub
    ```
 
    Hasilnya berupa satu baris `43.152.240.47 ssh-ed25519 ...`. Ini **kunci publik server** untuk memverifikasi tujuan SSH; bukan kunci privat login.
-3. Di pengaturan repo GitHub `lrmcorp/ln` → **Secrets and variables** → **Actions**, buat dua repository secret:
+3. Di pengaturan repo GitHub `lrmcorp/ln` → **Secrets and variables** → **Actions**, buat satu repository secret:
    - `VPS_SSH_KEY`: seluruh isi berkas kunci privat Tencent, termasuk baris awal/akhirnya.
-   - `VPS_HOST_KEY`: satu baris host key publik dari langkah 2.
 4. Pastikan firewall Tencent mengizinkan koneksi SSH port 22 dari GitHub Actions dan port 80/443 untuk pengunjung. Di tab **Variables**, buat `VPS_DEPLOY_ENABLED=true`. Lalu jalankan workflow **Deploy demo to Tencent Lighthouse** melalui **Actions → Run workflow**. Setelah berhasil, setiap push ke `main` memicu validasi dan deploy otomatis.
 
 Jangan kirim kunci privat atau kata sandi melalui chat atau commit. Workflow hanya memakai kunci dari GitHub Secret, memverifikasi host key, lalu menyalin commit yang diuji ke `~/ln` melalui SSH. Setelah layanan dimulai, workflow memeriksa pratinjau dari luar VPS agar aturan firewall dan proxy ikut teruji. Server membuat `.env.vps` sekali dengan izin berkas 0600 dan mempertahankannya pada deploy berikutnya. Database PostgreSQL tersimpan di volume Docker; deploy tidak menjalankan `down -v`.
