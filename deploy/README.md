@@ -24,7 +24,7 @@ Proxy Caddy hanya membuka `http://43.152.240.47/pratinjau` beserta gambar dan be
 
 ## Subdomain demo HTTPS
 
-Gunakan **hanya** `int.lnint.xyz` untuk aplikasi. Di DNS `lnint.xyz`, buat record `A` dengan nama/host `int` dan nilai `43.152.240.47`. Jangan buat record `A` lain atau record `AAAA` untuk `int`. Domain utama `lnint.xyz` tidak dikonfigurasi di Caddy; biarkan record situs utamanya kosong jika ingin domain utama tidak menampilkan apa pun. Record DNS bawaan penyedia domain perlu diperiksa secara terpisah.
+Gunakan **hanya** `int.lnint.xyz` untuk aplikasi. Di DNSPod untuk `lnint.xyz`, buat record `A` dengan nama/host `int` dan nilai `43.152.240.47`. Jangan buat record `A` lain atau record `AAAA` untuk `int`. Domain utama `lnint.xyz` tidak dikonfigurasi di Caddy. Jika domain utama dan `www.lnint.xyz` sama-sama tidak boleh mengarah ke VPS, hapus record `A` dengan host `@` dan `www`; pertahankan record `NS` dan verifikasi `TXT`. Tab registrar **Custom DNS Host** membuat host nameserver, bukan record `A` untuk situs, dan tidak diperlukan di sini.
 
 Pada setiap deploy, GitHub Actions memeriksa apakah `int.lnint.xyz` hanya teresolusi ke IP VPS. Sebelum DNS siap, pratinjau HTTP di IP tetap berjalan. Setelah DNS siap, workflow mengubah dua pengaturan nonrahasia dalam `.env.vps` di VPS (`CADDYFILE` dan `SITE_DOMAIN`), menjalankan ulang Caddy, lalu menguji `https://int.lnint.xyz/pratinjau` dengan validasi sertifikat TLS. Workflow **Activate demo HTTPS when DNS is ready** memeriksa DNS setiap 15 menit dan otomatis memicu deploy jika DNS sudah siap tetapi HTTPS belum sehat. Jadwal GitHub bisa terlambat dari waktu yang ditentukan. Port 80 dan 443 harus terbuka agar Caddy dapat memperoleh sertifikat.
 
