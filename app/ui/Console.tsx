@@ -1,5 +1,5 @@
 'use client';
-import {useState,useTransition} from 'react';
+import {useEffect,useState,useTransition} from 'react';
 
 type Actor={id:string;name:string;email:string;role:'owner'|'officer'};
 type Application={id:string;status:string;requested_principal:string;approved_principal:string|null;interest_amount:string|null;term_weeks:number|null;term_months:number|null;repayment_frequency:string;customer_name:string;officer_name:string;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;paid:string;transfer_reference:string|null;verification_status:string|null;signing_method:string|null};
@@ -22,6 +22,13 @@ export default function Console({actor,initial}:{actor:Actor|null;initial:Data|n
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
   const apps=initial?.applications??[];
+  useEffect(()=>{
+    const url=new URL(window.location.href);
+    if(url.searchParams.get('signed')!=='1')return;
+    setMessage('Tanda tangan nasabah tersimpan. Pengajuan kini menunggu tinjauan pemilik.');
+    url.searchParams.delete('signed');window.history.replaceState(null,'',url.pathname+url.search+url.hash);
+    const timer=setTimeout(()=>setMessage(''),8000);return()=>clearTimeout(timer);
+  },[]);
   async function post(path:string,body:unknown){
     setError('');setMessage('');
     startTransition(async()=>{
@@ -37,8 +44,8 @@ export default function Console({actor,initial}:{actor:Actor|null;initial:Data|n
         }
         if(path==='/api/logout'){window.history.replaceState(null,'','/');window.location.reload();return;}
         if(path==='/api/actions'){
-          const type=(body as {type?:string}).type;
-          window.location.hash=type==='policy'?'settings':'register';
+          const {type,applicationId}=body as {type?:string;applicationId?:string};
+          window.location.hash=type==='policy'?'settings':applicationId?`case-${applicationId}`:'register';
           setMessage('Tersimpan. Memperbarui daftar pinjaman…');
         }
         window.location.reload();
@@ -81,6 +88,11 @@ function Case({app,role,pending,post}:{app:Application;role:Actor['role'];pendin
   const [enrollment,setEnrollment]=useState<{code:string;expiresAt:string}|null>(null);
   const [enrollmentError,setEnrollmentError]=useState('');
   const [enrollmentPending,setEnrollmentPending]=useState(false);
+  useEffect(()=>{
+    if(window.location.hash!==`#case-${app.id}`)return;
+    setOpen(true);
+    document.getElementById(`case-${app.id}`)?.scrollIntoView({block:'start'});
+  },[app.id]);
   async function createEnrollment(){
     setEnrollmentPending(true);setEnrollmentError('');setEnrollment(null);
     try{
@@ -92,8 +104,8 @@ function Case({app,role,pending,post}:{app:Application;role:Actor['role'];pendin
   }
   const principal=Number(app.approved_principal??app.requested_principal);
   const total=Number(app.approved_principal??0)+Number(app.interest_amount??0);
-  return <article className="case"><div className="caseTop"><div><span className="caseStatus">{labels[app.status]??app.status}</span><h3>{displayName(app.customer_name)}</h3><p>Diajukan oleh {displayName(app.officer_name)} · {new Date(app.submitted_at).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</p><p className="nextStep">{nextStep(role,app.status)}</p></div><div className="caseAmount"><strong>{money(principal)}</strong><button className="textButton" aria-expanded={open} aria-label={`${open?'Sembunyikan':'Tampilkan'} detail pinjaman ${displayName(app.customer_name)}`} onClick={()=>setOpen(!open)}>{open?'Sembunyikan detail':role==='owner'&&ownerSteps[app.status]?'Tinjau dan tindak':'Lihat detail'}</button></div></div>
-    {open&&<div className="caseBody" id={`case-${app.id}`}><div className="facts"><div><small>Tenor</small><strong>{app.repayment_frequency==='monthly_first'?`${app.term_months} bulan`:`${app.term_weeks} minggu`}</strong></div><div><small>Total tagihan</small><strong>{app.snapshot?money(Number(app.snapshot.total)):app.approved_principal?money(total):'Menunggu tanda tangan'}</strong></div><div><small>Sudah dibayar</small><strong>{money(app.paid)}</strong></div><div><small>Referensi transfer</small><strong>{app.transfer_reference??'Belum dikonfirmasi'}</strong></div></div>
+  return <article className="case" id={`case-${app.id}`}><div className="caseTop"><div><span className="caseStatus">{labels[app.status]??app.status}</span><h3>{displayName(app.customer_name)}</h3><p>Diajukan oleh {displayName(app.officer_name)} · {new Date(app.submitted_at).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</p><p className="nextStep">{nextStep(role,app.status)}</p></div><div className="caseAmount"><strong>{money(principal)}</strong><button className="textButton" aria-expanded={open} aria-label={`${open?'Sembunyikan':'Tampilkan'} detail pinjaman ${displayName(app.customer_name)}`} onClick={()=>setOpen(!open)}>{open?'Sembunyikan detail':role==='owner'&&ownerSteps[app.status]?'Tinjau dan tindak':'Lihat detail'}</button></div></div>
+    {open&&<div className="caseBody"><div className="facts"><div><small>Tenor</small><strong>{app.repayment_frequency==='monthly_first'?`${app.term_months} bulan`:`${app.term_weeks} minggu`}</strong></div><div><small>Total tagihan</small><strong>{app.snapshot?money(Number(app.snapshot.total)):app.approved_principal?money(total):'Menunggu tanda tangan'}</strong></div><div><small>Sudah dibayar</small><strong>{money(app.paid)}</strong></div><div><small>Referensi transfer</small><strong>{app.transfer_reference??'Belum dikonfirmasi'}</strong></div></div>
       {app.verification_status&&<div className="evidenceReview"><p>Bukti identitas: {app.verification_status==='manual_review_completed'?'Ditinjau manual oleh pemilik':'Perlu tinjauan manual. Video bukan hasil verifikasi liveness otomatis.'}</p><a href={`/api/evidence/${app.id}/ktp`} target="_blank" rel="noopener noreferrer">Lihat foto KTP</a><a href={`/api/evidence/${app.id}/liveness`} target="_blank" rel="noopener noreferrer">Lihat video tantangan</a>{role==='owner'&&app.verification_status!=='manual_review_completed'&&<button disabled={pending} onClick={()=>post('/api/actions',{type:'review_evidence',applicationId:app.id,reason:'Bukti KTP dan video ditinjau manual dalam demo'})}>Tandai sudah ditinjau</button>}</div>}
       {app.snapshot&&<details><summary>Jadwal dan ketentuan yang ditandatangani</summary><div className="schedule"><p>Bunga tetap: {Number(app.snapshot.rateBps)/100}% untuk seluruh tenor. Kebijakan versi {app.snapshot.policyVersion}. Hash perjanjian demo: {app.snapshot_hash?.slice(0,16)}… {app.signing_method&&`Metode: ${app.signing_method==='officer_device_demo'?'perangkat petugas':'sesi nasabah'}.`}</p><table><thead><tr><th>Angsuran</th><th>Jatuh tempo</th><th>Pokok</th><th>Bunga</th></tr></thead><tbody>{app.snapshot.schedule.map((i:any)=><tr key={i.sequence}><td>{i.sequence}</td><td>{new Date(`${i.dueAt}T12:00:00Z`).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}</td><td>{money(i.principal)}</td><td>{money(i.interest)}</td></tr>)}</tbody></table>{Array.isArray(app.snapshot.terms)&&app.snapshot.terms.map((term:string,index:number)=><p key={index}>{term}</p>)}</div></details>}
       <div className="actions">{role==='officer'&&app.status==='awaiting_signature'&&<a className="caseActionLink" href={`/tanda-tangan/${app.id}`}>Buka syarat dan tanda tangan</a>}

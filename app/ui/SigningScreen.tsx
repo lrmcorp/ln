@@ -36,7 +36,7 @@ export default function SigningScreen({role,preview}:{role:'officer'|'customer';
       const response=await fetch('/api/signing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applicationId:preview.applicationId,
         signerName:name,accepted,termsHash:preview.quote.hash,signatureDataUrl:canvas.current.toDataURL('image/png')})});
       const result=await response.json();if(!response.ok)throw new Error(result.error??'Tanda tangan gagal');
-      window.location.assign(role==='officer'?'/?signed=1#register':'/');
+      window.location.assign(role==='officer'?`/?signed=1#case-${preview.applicationId}`:'/');
     }catch(cause){setError(cause instanceof Error?cause.message:'Tanda tangan gagal');setPending(false);}
   }
   const snapshot=preview.quote.snapshot;
