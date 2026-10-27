@@ -36,7 +36,8 @@ jobs:
         id: dns
         run: |
           addresses="$(getent ahostsv4 int.lnint.xyz | awk '{print $1}' | sort -u || true)"
-          ipv6_addresses="$(getent ahostsv6 int.lnint.xyz | awk '{print $1}' | sort -u || true)"
+          ipv6_addresses="$(getent ahostsv6 int.lnint.xyz | awk '{print $1}' | grep -v '^::ffff:' | sort -u || true)"
+          echo "A: ${addresses:-none}; native AAAA: ${ipv6_addresses:-none}" >> "$GITHUB_STEP_SUMMARY"
           if [[ "$addresses" == "43.152.240.47" && -z "$ipv6_addresses" ]]; then
             echo 'ready=true' >> "$GITHUB_OUTPUT"
             echo 'int.lnint.xyz resolves only to the Tencent VPS.' >> "$GITHUB_STEP_SUMMARY"
