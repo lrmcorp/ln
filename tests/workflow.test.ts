@@ -37,7 +37,6 @@ test('demo application passes role, signature, transfer, repayment, and ledger c
   await assert.rejects(recordPayment(customer,id,100000,receipt()),/Forbidden/);
   await assert.rejects(recordPayment(owner,id,100000,Buffer.from('not a receipt file')),/Invalid receipt/);
   await recordPayment(owner,id,410000,receipt());
-  await perform(owner,{type:'close',applicationId:id});
   const result=await pool.query('SELECT status FROM applications WHERE id=$1',[id]);
   assert.equal(result.rows[0].status,'closed');
   const balance=await pool.query(`SELECT j.id,SUM(l.debit-l.credit)::bigint AS difference FROM journals j JOIN journal_lines l ON l.journal_id=j.id WHERE j.application_id=$1 GROUP BY j.id`,[id]);

@@ -24,7 +24,11 @@ export async function POST(request:Request){
       address:form.get('address'),motherName:form.get('motherName'),bankName:form.get('bankName'),bankAccountNumber:form.get('bankAccountNumber'),
       accountHolder:form.get('accountHolder'),occupation:form.get('occupation')??'',loanPurpose:form.get('loanPurpose')??'',
       principal:Number(form.get('principal')),weeks:Number(form.get('weeks')),weeklyIncome:Number(form.get('weeklyIncome')),collectorId:(form.get('collectorId') as string|null)||null});
-    const result=await createIntake(actor,input,new Uint8Array(await ktp.arrayBuffer()),new Uint8Array(await liveness.arrayBuffer()));
+    const placeFile=form.get('place');
+    if(placeFile instanceof File&&placeFile.size>4*1024*1024)throw new Error('Invalid place photo');
+    const coord=(key:string)=>{const v=Number(form.get(key));return form.get(key)&&Number.isFinite(v)?v:null;};
+    const place={photo:placeFile instanceof File&&placeFile.size>0?new Uint8Array(await placeFile.arrayBuffer()):null,latitude:coord('latitude'),longitude:coord('longitude'),accuracyM:coord('accuracy')};
+    const result=await createIntake(actor,input,new Uint8Array(await ktp.arrayBuffer()),new Uint8Array(await liveness.arrayBuffer()),place);
     return NextResponse.json(result,{status:201});
   }catch(error){
     const message=error instanceof Error?error.message:'';
@@ -35,7 +39,7 @@ export async function POST(request:Request){
       'Invalid evidence files':'Foto KTP dan video tantangan wajib diunggah dalam batas ukuran',
       'Customer registered in another branch':'NIK ini terdaftar di cabang lain','Name does not match registered NIK':'Nama tidak sama dengan data NIK yang terdaftar',
       'Customer has an open loan':'Nasabah masih memiliki pinjaman berjalan','Above borrowing limit':'Jumlah melebihi batas pinjaman nasabah ini',
-      'Installment exceeds income share':'Cicilan mingguan melebihi batas porsi pendapatan nasabah','Collector required':'Pilih petugas penagih dari cabang Anda',
+      'Installment exceeds income share':'Cicilan mingguan melebihi batas porsi pendapatan nasabah','Collector required':'Pilih petugas penagih dari cabang Anda','Invalid place photo':'Foto lokasi harus JPG/PNG maksimal 4 MB',
       'Officer exposure limit reached':'Batas pokok beredar petugas ini akan terlampaui','Branch exposure limit reached':'Batas pokok beredar cabang akan terlampaui'};
     return NextResponse.json({error:conflict?'NIK sudah terdaftar':error instanceof z.ZodError?'Periksa kembali data pengajuan':known[message]??'Pengajuan gagal disimpan'},{status:conflict?409:400});
   }

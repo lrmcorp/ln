@@ -16,6 +16,15 @@ export default function IntakeWizard({policy,officers=[]}:{policy:Policy;officer
   const [fields,setFields]=useState(empty);
   const [ktp,setKtp]=useState<File|null>(null);
   const [liveness,setLiveness]=useState<File|null>(null);
+  const [place,setPlace]=useState<File|null>(null);
+  const [coords,setCoords]=useState<{latitude:number;longitude:number;accuracy:number}|null>(null);
+  const [locating,setLocating]=useState('');
+  function locate(){
+    if(!navigator.geolocation){setLocating('Perangkat tidak mendukung lokasi.');return;}
+    setLocating('Mencari lokasi…');
+    navigator.geolocation.getCurrentPosition(p=>{setCoords({latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy});setLocating('');},
+      ()=>setLocating('Lokasi tidak didapat. Izinkan akses lokasi atau lanjut tanpa lokasi.'),{enableHighAccuracy:true,timeout:15000});
+  }
   const [principal,setPrincipal]=useState('');
   const [weeks,setWeeks]=useState(String(policy.weekly_rates[0]?.weeks??''));
   const [pending,setPending]=useState(false);
@@ -48,7 +57,7 @@ export default function IntakeWizard({policy,officers=[]}:{policy:Policy;officer
     try{
       const body=new FormData();
       for(const [key,value] of Object.entries(fields))body.set(key,value);
-      if(manager)body.set('collectorId',collectorId);body.set('principal',principal);body.set('weeks',weeks);body.set('ktp',ktp);body.set('liveness',liveness);
+      if(manager)body.set('collectorId',collectorId);body.set('principal',principal);body.set('weeks',weeks);body.set('ktp',ktp);body.set('liveness',liveness);if(place)body.set('place',place);if(coords){body.set('latitude',String(coords.latitude));body.set('longitude',String(coords.longitude));body.set('accuracy',String(coords.accuracy));}
       const response=await fetch('/api/intake',{method:'POST',body});
       const result=await response.json();if(!response.ok)throw new Error(result.error??'Pengajuan gagal');
       window.location.assign(`/tanda-tangan/${result.id}`);
@@ -64,7 +73,11 @@ export default function IntakeWizard({policy,officers=[]}:{policy:Policy;officer
       {manager&&<><h2>Petugas penagih</h2><div className="intakeGrid"><label>Siapa yang menagih pinjaman ini?<select required value={collectorId} onChange={e=>setCollectorId(e.target.value)}><option value="">Pilih petugas</option>{officers.map(o=><option key={o.id} value={o.id}>{displayName(o.name)}</option>)}</select></label></div></>}
       <h2>Identitas nasabah</h2><div className="intakeGrid"><label>Nama sesuai KTP<input required maxLength={200} {...field('name')}/></label><label>NIK 16 digit<input name="nik" required inputMode="numeric" pattern="[0-9]{16}" {...field('nik')}/></label><label>Tanggal lahir<input required type="date" {...field('dateOfBirth')}/></label><label>Nama ibu kandung<input required maxLength={200} {...field('motherName')}/></label><label>Nomor telepon<input required type="tel" {...field('phone')}/></label><label>Alamat tempat tinggal<textarea required maxLength={500} {...field('address')}/></label></div>
       <h2>Rekening pencairan</h2><div className="intakeGrid"><label>Nama bank<input required {...field('bankName')}/></label><label>Nomor rekening<input required inputMode="numeric" pattern="[0-9]{5,30}" {...field('bankAccountNumber')}/></label><label>Nama pemilik rekening<input required {...field('accountHolder')}/></label></div>
-      <h2>Bukti identitas</h2><p className="intakeNote">Gunakan hanya data rekaan dalam demo. Berkas disimpan terenkripsi. Video tantangan belum diverifikasi otomatis dan harus ditinjau manual.</p><div className="intakeGrid"><label>Foto depan KTP (JPG/PNG, maksimal 4 MB)<input required={!ktp} type="file" accept="image/jpeg,image/png" capture="environment" onChange={event=>setKtp(event.target.files?.[0]??null)}/>{ktp&&<small>Tersimpan untuk pengajuan ini: {ktp.name}</small>}</label><label>Video wajah menoleh kiri dan kanan (MP4/WebM, maksimal 12 MB)<input required={!liveness} type="file" accept="video/mp4,video/webm" capture="user" onChange={event=>setLiveness(event.target.files?.[0]??null)}/>{liveness&&<small>Tersimpan untuk pengajuan ini: {liveness.name}</small>}</label></div><div className="intakeGrid"><label>Pendapatan bersih per minggu (Rp)<input required type="number" min="1" step="1" inputMode="numeric" {...field('weeklyIncome')}/></label><label>Pekerjaan atau sumber penghasilan (opsional)<input maxLength={200} {...field('occupation')}/></label><label>Tujuan pinjaman (opsional)<input maxLength={300} {...field('loanPurpose')}/></label></div>
+      <h2>Bukti identitas</h2><p className="intakeNote">Gunakan hanya data rekaan dalam demo. Berkas disimpan terenkripsi. Video tantangan belum diverifikasi otomatis dan harus ditinjau manual.</p><div className="intakeGrid"><label>Foto depan KTP (JPG/PNG, maksimal 4 MB)<input required={!ktp} type="file" accept="image/jpeg,image/png" capture="environment" onChange={event=>setKtp(event.target.files?.[0]??null)}/>{ktp&&<small>Tersimpan untuk pengajuan ini: {ktp.name}</small>}</label><label>Video wajah menoleh kiri dan kanan (MP4/WebM, maksimal 12 MB)<input required={!liveness} type="file" accept="video/mp4,video/webm" capture="user" onChange={event=>setLiveness(event.target.files?.[0]??null)}/>{liveness&&<small>Tersimpan untuk pengajuan ini: {liveness.name}</small>}</label></div>
+      <h2>Lokasi rumah atau usaha</h2><p className="intakeNote">Disarankan. Membantu tinjauan dan penagihan. Koordinat dibulatkan sekitar 100 meter.</p>
+      <div className="intakeGrid"><label>Foto rumah atau tempat usaha (JPG/PNG, opsional)<input type="file" accept="image/jpeg,image/png" capture="environment" onChange={event=>setPlace(event.target.files?.[0]??null)}/>{place&&<small>Tersimpan: {place.name}</small>}</label>
+        <div className="placeLocate"><button type="button" className="secondary" onClick={locate}>{coords?'Perbarui lokasi':'Ambil lokasi sekarang'}</button>
+          {coords&&<small>Lokasi tersimpan: {coords.latitude.toFixed(3)}, {coords.longitude.toFixed(3)}</small>}{locating&&<small role="status">{locating}</small>}</div></div><div className="intakeGrid"><label>Pendapatan bersih per minggu (Rp)<input required type="number" min="1" step="1" inputMode="numeric" {...field('weeklyIncome')}/></label><label>Pekerjaan atau sumber penghasilan (opsional)<input maxLength={200} {...field('occupation')}/></label><label>Tujuan pinjaman (opsional)<input maxLength={300} {...field('loanPurpose')}/></label></div>
       {error&&<p className="error" role="alert">{error}</p>}<button disabled={checking}>{checking?'Memeriksa NIK…':'Lanjut ke jumlah'}</button>
     </form>:<form method="post" className="intakeForm" onSubmit={save}><h2>Jumlah dan tenor</h2><p>Kebijakan versi {policy.version}. Bunga tetap di atas pokok sesuai tenor. Cicilan mingguan dimulai 7 hari setelah pemilik menyetujui pinjaman.</p><div className="intakeGrid"><label>Pokok pinjaman (Rp)<input required type="number" min={policy.min_principal} max={maxPrincipal} step="1" value={principal} onChange={event=>setPrincipal(event.target.value)}/></label></div>
       {limit&&<p className="limitNote"><strong>{limit.repeat?`Nasabah lama, kelas ${limit.grade}`:'Nasabah baru'}</strong> · {limit.repeat?`${limit.gradeLabel} · `:''}{limit.reason} · batas pinjaman {money(maxPrincipal)} · cicilan maksimal {money(incomeCap)} per minggu ({limit.maxInstallmentShareBps/100}% pendapatan)</p>}

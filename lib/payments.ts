@@ -7,7 +7,7 @@ import {imageMime,protect,reveal} from './protected-data';
 import {readReceiptAmount} from './receipt-reader';
 import {A,cr,dr,journal,loanBalances} from './ledger';
 import {earlyPayoffQuote,runAccruals,todayIso} from './accounting';
-import {audit,inScope,locked,setStatus} from './workflow';
+import {audit,closeIfSettled,inScope,locked,setStatus} from './workflow';
 
 const maxReceiptBytes=5*1024*1024;
 export function receiptMime(data:Uint8Array){
@@ -90,6 +90,7 @@ export async function recordPayment(actor:Actor|null,applicationId:string,amount
     await journal(c,app.id,recovery?'recovery':'payment',p.id,recovery?[dr(debitAccount,paid),cr(A.recoveryIncome,paid)]:
       [dr(debitAccount,paid),cr(A.principal,allocation.principal),cr(A.interest,allocation.interest),cr(A.fee,allocation.fee)]);
     if(!recovery&&remaining===0) await setStatus(c,actor,app,'paid_off');
+    if(!recovery&&remaining===0) await closeIfSettled(c,actor,app.id);
     await audit(c,actor,app.id,'payment',null,{paymentId:p.id,amount:paid,amountSource:source,method,status,...allocation,recovery,waived,reference:ref,receiptSha256:file.sha256});
     return {id:app.id,paymentId:p.id as string,amount:paid,amountSource:source,status,allocation,remaining};
   });
@@ -109,6 +110,7 @@ export async function verifyPayment(actor:Actor|null,paymentId:string,note=''){
   return transaction(async c=>{
     const row=await lockedPayment(c,actor,paymentId);
     await c.query(`UPDATE payments SET status='verified',reviewed_by=$1,reviewed_at=now(),review_note=$2 WHERE id=$3`,[actor.id,note.trim()||null,paymentId]);
+    await closeIfSettled(c,actor,row.application_id);
     await c.query('INSERT INTO audit_events(actor_id,subject_type,subject_id,action,after_data) VALUES($1,$2,$3,$4,$5)',[actor.id,'payment',paymentId,'payment_verified',JSON.stringify({applicationId:row.application_id,amount:Number(row.amount)})]);
     return {id:paymentId};
   });

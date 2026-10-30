@@ -1,14 +1,15 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {borrowerGrade} from '@/lib/grade';
+import {ReasonForm} from './ReasonForm';
 import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor,type StaffRole} from './Shell';
 
 type Payment={id:string;amount:string;reference:string|null;createdAt:string;recordedBy:string;amountSource:'entered'|'read_confirmed'|'read_auto';status:'pending'|'verified'|'rejected';
   method:'transfer'|'cash';fee:string;recovery:string;earlyPayoff:boolean;reviewNote:string|null;hasReceipt:boolean};
 type Application={id:string;status:string;requested_principal:string;approved_principal:string|null;interest_amount:string|null;term_weeks:number|null;term_months:number|null;repayment_frequency:string;
-  customer_name:string;customer_phone:string|null;officer_name:string;officer_id:string;collector_id:string;collector_name:string|null;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;
+  customer_name:string;customer_phone:string|null;officer_name:string;officer_id:string;customer_id:string;collector_id:string;collector_name:string|null;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;
   paid:string;recovered:string;remaining:string;fee:string;payoff_quote:string;pending_payments:number;restructure_pending:boolean;written_off_amount:string;
-  transfer_reference:string|null;verification_status:string|null;signing_method:string|null;overdue_through_yesterday:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:Payment[];grade_loans:number;grade_worst_dpd:number;grade_written_off:boolean};
+  transfer_reference:string|null;verification_status:string|null;signing_method:string|null;overdue_through_yesterday:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:Payment[];grade_loans:number;grade_worst_dpd:number;grade_written_off:boolean;place_lat:number|null;place_lng:number|null;has_place_photo:boolean|null};
 export type Policy={version:number;min_principal:string;max_principal:string;late_fee_monthly_bps:number;weekly_rates:{weeks:number;rateBps:number}[];first_loan_max:string;repeat_growth_bps:number;max_installment_income_bps:number;max_officer_exposure?:string;max_branch_exposure?:string};
 type Data={today:string;applications:Application[];totals:{net_cash:string;principal_outstanding:string;interest_receivable:string}|null;policy:Policy|null;
   counts:{pending:number;active:number;unverified:number;deposits:number}|null;officers:{id:string;name:string;branch_id:string}[]};
@@ -16,7 +17,7 @@ type Post=(path:string,body:unknown,hash?:string)=>void;
 type Chain=(steps:{path:string;body:unknown}[],hash:string)=>void;
 
 const labels:Record<string,string>={submitted:'Menunggu keputusan',awaiting_signature:'Menunggu tanda tangan',signed_pending_approval:'Menunggu persetujuan pemilik',approved:'Disetujui',signed:'Perjanjian ditandatangani',
-  release_authorized:'Pencairan diizinkan',transfer_initiated:'Transfer dimulai',active:'Aktif',paid_off:'Lunas',closed:'Ditutup',written_off:'Dihapusbukukan'};
+  release_authorized:'Pencairan diizinkan',transfer_initiated:'Transfer dimulai',active:'Aktif',paid_off:'Lunas',closed:'Ditutup',written_off:'Dihapusbukukan',rejected:'Ditolak'};
 const ownerSteps:Record<string,string>={submitted:'Putuskan pengajuan',signed_pending_approval:'Periksa bukti dan setujui',signed:'Cairkan dana',release_authorized:'Cairkan dana',transfer_initiated:'Konfirmasi transfer',paid_off:'Tutup pinjaman'};
 const WRITE_OFF_MIN_DPD=30;
 
@@ -33,7 +34,7 @@ function nextOpen(app:Application){
   for(const item of app.installments){const before=cumulative;cumulative+=Number(item.amount);if(cumulative>paid)return {...item,open:cumulative-Math.max(before,paid)};}
   return null;
 }
-const done=(status:string)=>['paid_off','closed','written_off'].includes(status);
+const done=(status:string)=>['paid_off','closed','written_off','rejected'].includes(status);
 
 function needsAction(app:Application,role:StaffRole,today:string){
   if(role==='owner')return !!ownerSteps[app.status]||app.pending_payments>0||dpdOf(app,today)>=WRITE_OFF_MIN_DPD;
@@ -60,7 +61,7 @@ export default function Console({actor,initial}:{actor:StaffActor|null;initial:D
     const timer=setTimeout(()=>action.setMessage(''),8000);return()=>clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
-  const post:Post=(path,body,hash)=>action.run(path,body,{hash:hash??((body as {applicationId?:string})?.applicationId?`case-${(body as {applicationId:string}).applicationId}`:body instanceof FormData?`case-${body.get('applicationId')}`:'register')});
+  const post:Post=(path,body,hash)=>action.run(path,body,{offline:path==='/api/payments'?'Pembayaran':undefined,hash:hash??((body as {applicationId?:string})?.applicationId?`case-${(body as {applicationId:string}).applicationId}`:body instanceof FormData?`case-${body.get('applicationId')}`:'register')});
   const chain:Chain=(steps,hash)=>action.chain(steps,{hash});
   const filtered=useMemo(()=>{
     if(!actor)return [];
@@ -218,7 +219,7 @@ function Case({app,role,actorId,today,officers,pending,post,chain,cash}:{app:App
   const toggleLabel=open?'Tutup':role==='owner'&&ownerSteps[app.status]?'Tinjau':active&&role!=='owner'?'Catat bayar':'Detail';
   const sub=app.restructure_pending?'Menunggu tanda tangan restrukturisasi':active&&next?`Berikutnya ${shortDate(next.dueAt)} · ${money(next.open)}`:role==='owner'&&ownerSteps[app.status]?ownerSteps[app.status]:labels[app.status]??app.status;
   return <article className="case" id={`case-${app.id}`}><div className="caseTop"><div>{chip}{app.pending_payments>0&&<StatusChip tone="pending">{app.pending_payments} menunggu verifikasi</StatusChip>}<GradeChip app={app}/>
-      <h3>{displayName(app.customer_name)}</h3><p>{role!=='officer'||!isCollector?`Penagih ${displayName(app.collector_name??app.officer_name)}`:`Diajukan ${shortDate(app.submitted_at)}`}</p><p className="nextStep">{sub}</p></div>
+      <h3><a className="nameLink" href={`/nasabah/${app.customer_id}`}>{displayName(app.customer_name)}</a></h3><p>{role!=='officer'||!isCollector?`Penagih ${displayName(app.collector_name??app.officer_name)}`:`Diajukan ${shortDate(app.submitted_at)}`}</p><p className="nextStep">{sub}</p></div>
     <div className="caseAmount"><small>{headline.label}</small><strong>{headline.value}</strong><button className="textButton" aria-expanded={open} aria-label={`${toggleLabel}: ${displayName(app.customer_name)}`} onClick={()=>setOpen(!open)}>{toggleLabel}</button></div></div>
     {['active','paid_off','written_off'].includes(app.status)&&<Repayment app={app} today={today}/>}
     {open&&<div className="caseBody"><div className="facts"><div><small>Tenor</small><strong>{app.repayment_frequency==='monthly_first'?`${app.term_months} bulan`:`${app.term_weeks} minggu`}</strong></div><div><small>Pokok</small><strong>{money(app.approved_principal??app.requested_principal)}</strong></div><div><small>Diajukan oleh</small><strong>{displayName(app.officer_name)}</strong></div><div><small>Referensi transfer</small><strong>{app.transfer_reference??'Belum dikonfirmasi'}</strong></div></div>
@@ -227,6 +228,8 @@ function Case({app,role,actorId,today,officers,pending,post,chain,cash}:{app:App
       {app.verification_status&&role==='owner'&&<div className="evidenceReview"><p>Bukti identitas: {app.verification_status==='manual_review_completed'?'Ditinjau manual oleh pemilik':'Perlu tinjauan manual. Video bukan hasil verifikasi liveness otomatis.'}</p><a href={`/api/evidence/${app.id}/ktp`} target="_blank" rel="noopener noreferrer">Lihat foto KTP</a><a href={`/api/evidence/${app.id}/liveness`} target="_blank" rel="noopener noreferrer">Lihat video tantangan</a>{app.status==='signed_pending_approval'&&<button disabled={pending} onClick={()=>chain([
         ...(app.verification_status!=='manual_review_completed'?[{path:'/api/actions',body:{type:'review_evidence',applicationId:app.id,reason:'Bukti KTP dan video ditinjau manual oleh pemilik'}}]:[]),
         {path:'/api/actions',body:{type:'approve',applicationId:app.id}},{path:'/api/actions',body:{type:'authorize',applicationId:app.id}}],`case-${app.id}`)}>Bukti sesuai, setujui</button>}</div>}
+      {(app.has_place_photo||app.place_lat!==null)&&<p className="placeLinks">Lokasi rumah atau usaha: {app.has_place_photo&&<a href={`/api/evidence/${app.id}/place`} target="_blank" rel="noopener noreferrer">Lihat foto</a>}
+        {app.place_lat!==null&&app.place_lng!==null&&<a href={`https://www.google.com/maps?q=${app.place_lat},${app.place_lng}`} target="_blank" rel="noopener noreferrer">Buka di peta ({app.place_lat}, {app.place_lng})</a>}</p>}
       {app.snapshot&&<details><summary>Ketentuan yang ditandatangani</summary><div className="schedule"><p>Bunga tetap {Number(app.snapshot.rateBps)/100}% untuk seluruh tenor. Kebijakan versi {app.snapshot.policyVersion}. {app.signing_method&&`Ditandatangani di ${app.signing_method==='officer_device_demo'?'perangkat petugas':'sesi nasabah'}.`}</p>{Array.isArray(app.snapshot.terms)&&app.snapshot.terms.map((term:string,index:number)=><p key={index}>{term}</p>)}</div></details>}
       <div className="actions">
         {(role==='officer'||(role==='manager'&&app.officer_id===actorId))&&app.status==='awaiting_signature'&&<a className="caseActionLink" href={`/tanda-tangan/${app.id}`}>Buka syarat dan tanda tangan</a>}
@@ -250,6 +253,9 @@ function Case({app,role,actorId,today,officers,pending,post,chain,cash}:{app:App
             {path:'/api/actions',body:{type:'confirm',applicationId:app.id,bankReference:f.get('bankReference'),proof:f.get('proof')}}],`case-${app.id}`);}}>
           {cash!==null&&cash<Number(app.approved_principal)&&<p className="error" role="alert">Kas tercatat {money(cash)}, kurang dari jumlah pencairan. Pastikan dana tersedia sebelum transfer.</p>}<p>Transfer {money(app.approved_principal)} ke rekening nasabah, lalu isi referensinya. Pinjaman aktif dan jadwal mingguan berjalan. Simulasi bank untuk demo.</p>
           <label>Referensi bank (angka)<input name="bankReference" inputMode="numeric" pattern="[0-9]+" required/></label><label>Catatan bukti transfer<input name="proof" required defaultValue="Transfer dari rekening operasional"/></label><button disabled={pending}>Cairkan dana</button></form>}
+        {role==='owner'&&['submitted','awaiting_signature','signed_pending_approval','approved','signed','release_authorized'].includes(app.status)&&<div className="rejectRow">
+          <ReasonForm label="Tolak pengajuan" reasons={['Pendapatan tidak cukup','Data atau bukti tidak sesuai','Riwayat pembayaran buruk','Nasabah membatalkan','Lainnya']} pending={pending}
+            onSubmit={reason=>post('/api/actions',{type:'reject',applicationId:app.id,reason})}/></div>}
         {role==='owner'&&app.status==='paid_off'&&(app.pending_payments>0?<p>Tutup pinjaman setelah {app.pending_payments} pembayaran diverifikasi. <a href="/verifikasi">Buka verifikasi</a></p>:<button disabled={pending} onClick={()=>post('/api/actions',{type:'close',applicationId:app.id})}>Tutup pinjaman lunas</button>)}
         {app.status==='closed'&&<p className="completion">Semua kewajiban tercatat telah dibayar dan pinjaman ditutup.</p>}</div></div>}
   </article>;

@@ -6,7 +6,7 @@ import {addDays,earlyPayoffQuote,todayIso} from '../lib/accounting';
 import {dailyTargets,rollRates,type LoanRow} from '../lib/reports';
 import {loanBalances} from '../lib/ledger';
 import {transaction} from '../lib/db';
-import {recordPayment} from '../lib/payments';
+import {recordPayment,verifyPayment} from '../lib/payments';
 import {closePaidOff} from '../lib/workflow';
 import {homeDashboard} from '../lib/dashboard';
 import {stopReceiptReader} from '../lib/receipt-reader';
@@ -25,7 +25,7 @@ test('borrower grade follows the worst lateness across loans',()=>{
   assert.equal(borrowerGrade({loans:1,worstDpd:0,writtenOff:true}).grade,'D');
 });
 
-test('close all paid-off loans closes only those with nothing awaiting verification',async()=>{
+test('paid-off loans close themselves once nothing awaits verification; close-all stays owner-only',async()=>{
   const clean=await activeWeeklyLoan(actors);
   const held=await activeWeeklyLoan(actors);
   for(const loan of [clean,held]){
@@ -33,11 +33,13 @@ test('close all paid-off loans closes only those with nothing awaiting verificat
     await recordPayment(loan===held?actors.officer:actors.manager,loan.id,quote,pngReceipt(),{earlyPayoff:true,method:loan===held?'cash':'transfer'});
   }
   await assert.rejects(closePaidOff(actors.manager),/Forbidden/);
-  const result=await closePaidOff(actors.owner);
-  assert.ok(result.closed>=1);
+  await closePaidOff(actors.owner);
   const status=async(id:string)=>(await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status;
   assert.equal(await status(clean.id),'closed');
   assert.equal(await status(held.id),'paid_off','officer cash payoff waits for verification first');
+  const pending=(await pool.query(`SELECT id FROM payments WHERE application_id=$1 AND status='pending'`,[held.id])).rows[0];
+  await verifyPayment(actors.manager,pending.id);
+  assert.equal(await status(held.id),'closed');
 });
 
 test('dashboard reports aging that adds up to principal outstanding and owner liquidity',async()=>{
@@ -123,4 +125,31 @@ test('a branch manager can originate a loan for an officer, who collects it and 
   const preview=await signingPreview(actors.officer,id);
   await signApplication(actors.officer,id,name,true,preview.quote.hash,Buffer.from([137,80,78,71,13,10,26,10,...Array(300).fill(0)]));
   assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'signed_pending_approval');
+});
+
+test('owner can reject an application with a reason before money moves',async()=>{
+  const {createIntake}=await import('../lib/intake');
+  const {perform}=await import('../lib/workflow');
+  const {ktp,video,uniqueNik}=await import('./helpers');
+  const {id}=await createIntake(actors.officer,{nik:uniqueNik(),dateOfBirth:'1990-01-01',phone:'081234567890',address:'Alamat rekaan',motherName:'Ibu Rekaan',bankName:'Bank Demo',
+    bankAccountNumber:'1234567890',accountHolder:'Nasabah Tolak',occupation:'',loanPurpose:'',principal:300000,weeks:4,weeklyIncome:2000000,name:'Nasabah Tolak'},ktp,video,
+    {photo:Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(40)]),latitude:-6.200123,longitude:106.816666,accuracyM:20});
+  const place=(await pool.query('SELECT latitude::float AS lat,longitude::float AS lng,accuracy_m FROM intake_place WHERE application_id=$1',[id])).rows[0];
+  assert.deepEqual(place,{lat:-6.2,lng:106.817,accuracy_m:100},'coordinates rounded to about 100 m');
+  await assert.rejects(perform(actors.manager,{type:'reject',applicationId:id,reason:'x'}),/Forbidden/);
+  await assert.rejects(perform(actors.owner,{type:'reject',applicationId:id,reason:' '}),/Reason required/);
+  await perform(actors.owner,{type:'reject',applicationId:id,reason:'Pendapatan tidak cukup'});
+  assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'rejected');
+  await assert.rejects(perform(actors.owner,{type:'reject',applicationId:id,reason:'lagi'}),/Rejection not allowed/);
+});
+
+test('customer profile is scoped by role',async()=>{
+  const {customerProfile}=await import('../lib/customers');
+  const {id}=await activeWeeklyLoan(actors);
+  const customerId=(await pool.query('SELECT customer_id FROM applications WHERE id=$1',[id])).rows[0].customer_id;
+  const profile=await customerProfile(actors.officer,customerId);
+  assert.equal(profile.loans[0].id,id);
+  assert.equal((await customerProfile(actors.owner,customerId)).grade.grade,'A');
+  const stranger={...actors.officer,id:(await pool.query(`SELECT gen_random_uuid() AS id`)).rows[0].id};
+  await assert.rejects(customerProfile(stranger,customerId),/Forbidden/);
 });

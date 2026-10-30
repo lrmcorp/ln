@@ -26,7 +26,6 @@ test('a borrower who paid on time returns with a higher limit; open loans and na
   const {id}=await activeWeeklyLoan(actors,800000,4,{nik,name});
   await assert.rejects(borrowerLookup(actors.officer,nik,name),/open loan/);
   await recordPayment(actors.manager,id,960000,pngReceipt());
-  await perform(actors.owner,{type:'close',applicationId:id});
   assert.deepEqual(await borrowerLookup(actors.officer,nik,name),{limit:1200000,repeat:true,reason:'Kelas A: lunas tepat waktu, batas naik',grade:'A',gradeLabel:'Selalu tepat waktu',maxInstallmentShareBps:3500});
   await assert.rejects(borrowerLookup(actors.officer,nik,'Nama Lain'),/Name does not match/);
   const other={...actors.officer,branch_id:randomUUID()};

@@ -73,5 +73,5 @@ test('weekly intake starts installments at approval and staff record receipted p
   assert.equal(pending.length,2);
   await assert.rejects(verifyPayment(officer,pending[0].id),/Forbidden/);
   for(const row of pending)await verifyPayment(manager,row.id);
-  await perform(owner,{type:'close',applicationId:id});
+  assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'closed','closes itself once the last payment is verified');
 });

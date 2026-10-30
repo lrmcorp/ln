@@ -3,7 +3,7 @@ import {requireRole} from './auth';
 import {pool,transaction} from './db';
 import {addDays,runPortfolioAccruals,todayIso} from './accounting';
 
-export type DueItem={id:string;customerName:string;phone:string|null;collectorId:string|null;collectorName:string|null;branchId:string;
+export type DueItem={id:string;customerId:string;promiseBroken:boolean;customerName:string;phone:string|null;collectorId:string|null;collectorName:string|null;branchId:string;
   remaining:number;fee:number;nextDue:{dueAt:string;amount:number}|null;dpd:number;overdueAmount:number;
   lastVisit:{outcome:string;promiseDate:string|null;note:string|null;at:string}|null;bucket:'late'|'today'|'promise'|'week'|'later'};
 
@@ -24,7 +24,7 @@ export async function dueList(actor:Actor,options:{branchId?:string;collectorId?
   let where=scopeClause(actor,params);
   if(actor.role==='owner'&&options.branchId){params.push(options.branchId);where+=` AND a.branch_id=$${params.length}`;}
   if(actor.role!=='officer'&&options.collectorId){params.push(options.collectorId);where+=` AND COALESCE(a.collector_id,a.officer_id)=$${params.length}`;}
-  const loans=(await pool.query(`SELECT a.id,a.branch_id,COALESCE(a.collector_id,a.officer_id) AS collector_id,c.name AS customer_name,c.phone,u.name AS collector_name,
+  const loans=(await pool.query(`SELECT a.id,a.branch_id,a.customer_id,COALESCE(a.collector_id,a.officer_id) AS collector_id,c.name AS customer_name,c.phone,u.name AS collector_name,
       COALESCE((SELECT SUM(principal+interest) FROM payments p WHERE p.application_id=a.id AND p.status<>'rejected'),0)::bigint AS paid,
       COALESCE((SELECT SUM(CASE WHEN l.account IN ('principal_receivable','interest_receivable','fee_receivable') THEN l.debit-l.credit ELSE 0 END)
         FROM journal_lines l JOIN journals j ON j.id=l.journal_id WHERE j.application_id=a.id),0)::bigint AS remaining,
@@ -49,12 +49,14 @@ export async function dueList(actor:Actor,options:{branchId?:string;collectorId?
     const dpd=nextDue&&nextDue.dueAt<today?Math.round((Date.parse(`${today}T12:00:00Z`)-Date.parse(`${nextDue.dueAt}T12:00:00Z`))/86400000):0;
     const lastVisit=loan.last_visit;
     const promiseDue=lastVisit?.outcome==='promise'&&lastVisit.promiseDate&&lastVisit.promiseDate<=today;
+    // A promise whose date has passed while the loan is still late: call first.
+    const promiseBroken=!!(lastVisit?.outcome==='promise'&&lastVisit.promiseDate&&lastVisit.promiseDate<today&&dpd>0);
     const bucket:DueItem['bucket']=dpd>0?'late':nextDue?.dueAt===today?'today':promiseDue?'promise':nextDue&&nextDue.dueAt<=weekEnd?'week':'later';
-    return {id:loan.id,customerName:loan.customer_name,phone:loan.phone,collectorId:loan.collector_id,collectorName:loan.collector_name,branchId:loan.branch_id,
+    return {id:loan.id,customerId:loan.customer_id as string,promiseBroken,customerName:loan.customer_name,phone:loan.phone,collectorId:loan.collector_id,collectorName:loan.collector_name,branchId:loan.branch_id,
       remaining:Number(loan.remaining),fee:Number(loan.fee),nextDue,dpd,overdueAmount:overdueAmount+Number(loan.fee),lastVisit,bucket};
   });
   const order={late:0,today:1,promise:2,week:3,later:4};
-  return items.sort((a,b)=>order[a.bucket]-order[b.bucket]||b.dpd-a.dpd||(a.nextDue?.dueAt??'').localeCompare(b.nextDue?.dueAt??''));
+  return items.sort((a,b)=>order[a.bucket]-order[b.bucket]||Number(b.promiseBroken)-Number(a.promiseBroken)||b.dpd-a.dpd||(a.nextDue?.dueAt??'').localeCompare(b.nextDue?.dueAt??''));
 }
 
 export async function logVisit(actor:Actor|null,applicationId:string,outcome:string,promiseDate:string|null,note:string){

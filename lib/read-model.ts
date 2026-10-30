@@ -11,10 +11,10 @@ export async function dashboard(actor:Actor){
   const scope=actor.role==='officer'?'WHERE (a.officer_id=$1 OR a.collector_id=$1)':actor.role==='manager'?'WHERE a.branch_id=$1':'';
   const params=actor.role==='officer'?[actor.id]:actor.role==='manager'?[actor.branch_id]:[];
   const [applications,totals,policy,counts,officers]=await Promise.all([
-    pool.query(`SELECT a.id,a.status,a.requested_principal,a.approved_principal,a.interest_amount,a.term_weeks,a.term_months,a.repayment_frequency,a.submitted_at,a.branch_id,
+    pool.query(`SELECT a.id,a.customer_id,a.status,a.requested_principal,a.approved_principal,a.interest_amount,a.term_weeks,a.term_months,a.repayment_frequency,a.submitted_at,a.branch_id,
       a.officer_id,COALESCE(a.collector_id,a.officer_id) AS collector_id,cu.name AS collector_name,a.written_off_amount,
       c.name AS customer_name,c.phone AS customer_phone,u.name AS officer_name,ag.snapshot,ag.snapshot_hash,ag.signed_at,
-      ie.verification_status,se.signing_method,
+      ie.verification_status,se.signing_method,pl.latitude::float AS place_lat,pl.longitude::float AS place_lng,(pl.photo_cipher IS NOT NULL) AS has_place_photo,
       COALESCE((SELECT SUM(p.principal+p.interest)::bigint FROM payments p WHERE p.application_id=a.id AND p.status<>'rejected'),0) AS paid,
       COALESCE((SELECT SUM(p.recovery)::bigint FROM payments p WHERE p.application_id=a.id AND p.status<>'rejected'),0) AS recovered,
       COALESCE((SELECT COUNT(*) FROM payments p WHERE p.application_id=a.id AND p.status='pending'),0)::int AS pending_payments,
@@ -30,7 +30,7 @@ export async function dashboard(actor:Actor){
         FROM payments p JOIN users vu ON vu.id=p.verified_by LEFT JOIN payment_receipts pr ON pr.payment_id=p.id WHERE p.application_id=a.id),'[]') AS payments
       FROM applications a JOIN customers c ON c.id=a.customer_id JOIN users u ON u.id=a.officer_id LEFT JOIN users cu ON cu.id=COALESCE(a.collector_id,a.officer_id)
       LEFT JOIN LATERAL (SELECT snapshot,snapshot_hash,signed_at FROM agreements WHERE application_id=a.id AND kind='original' ORDER BY version DESC LIMIT 1) ag ON true
-      LEFT JOIN intake_evidence ie ON ie.application_id=a.id
+      LEFT JOIN intake_evidence ie ON ie.application_id=a.id LEFT JOIN intake_place pl ON pl.application_id=a.id
       LEFT JOIN LATERAL (SELECT s.signing_method FROM signature_evidence s JOIN agreements g ON g.id=s.agreement_id WHERE g.application_id=a.id ORDER BY g.version DESC LIMIT 1) se ON true
       LEFT JOIN disbursements d ON d.application_id=a.id ${scope} ORDER BY a.submitted_at DESC LIMIT 200`,params),
     actor.role==='owner'?pool.query(`SELECT

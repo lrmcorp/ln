@@ -35,6 +35,7 @@ const errors:Record<string,string>={
   'Invalid weekly rates':'Tabel bunga mingguan tidak valid. Gunakan 1 sampai 52 minggu tanpa duplikat dan bunga 0 sampai 100%',
   'Officer exposure limit reached':'Batas pokok beredar per petugas akan terlampaui. Naikkan batas di kebijakan atau alihkan ke petugas lain',
   'Branch exposure limit reached':'Batas pokok beredar per cabang akan terlampaui',
+  'Rejection not allowed':'Pengajuan ini tidak dapat ditolak lagi','Reason required':'Alasan wajib diisi',
   'Signed terms mismatch':'Syarat yang ditandatangani tidak cocok dengan pengajuan'
 };
 const schema=z.discriminatedUnion('type',[
@@ -47,7 +48,8 @@ const schema=z.discriminatedUnion('type',[
   z.object({type:z.literal('authorize'),applicationId:uuid}),
   z.object({type:z.literal('initiate'),applicationId:uuid,idempotencyKey:z.string().min(1).max(100)}),
   z.object({type:z.literal('confirm'),applicationId:uuid,bankReference:z.string().regex(/^\d+$/),proof:z.string().min(1).max(500)}),
-  z.object({type:z.literal('close'),applicationId:uuid})
+  z.object({type:z.literal('close'),applicationId:uuid}),
+  z.object({type:z.literal('reject'),applicationId:uuid,reason:z.string().max(500)})
 ]);
 export async function POST(request:Request){
   try {

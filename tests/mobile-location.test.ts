@@ -47,5 +47,5 @@ test('paired Android device reports only for an active consented loan and stops 
     Buffer.concat([Buffer.from('%PDF-1.4\n'),Buffer.from(randomUUID())]),{});
   assert.equal((await customerLocation(customer)).enabled,false);
   await assert.rejects(mobileDeviceStatus(token),/Invalid device token/);
-  await perform(owner,{type:'close',applicationId:application.id});
+  assert.equal((await pool.query("SELECT status FROM applications WHERE id=$1",[application.id])).rows[0].status,"closed");
 });

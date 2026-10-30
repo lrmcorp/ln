@@ -19,7 +19,7 @@ type Action =
  | {type:'authorize';applicationId:string}
  | {type:'initiate';applicationId:string;idempotencyKey:string}
  | {type:'confirm';applicationId:string;bankReference:string;proof:string}
- | {type:'close';applicationId:string};
+ | {type:'close';applicationId:string} | {type:'reject';applicationId:string;reason:string};
 
 export async function audit(c:PoolClient,actor:Actor,appId:string,action:string,before:unknown,after:unknown,reason?:string){
   await c.query('INSERT INTO audit_events(actor_id,subject_type,subject_id,action,before_data,after_data,reason) VALUES($1,$2,$3,$4,$5,$6,$7)',
@@ -207,6 +207,13 @@ export async function perform(actor:Actor|null, action:Action){
         await setStatus(c,actor,app,'active');
         return {id:app.id};
       }
+      case 'reject': {
+        requireRole(actor,['owner']);
+        if(!['submitted','awaiting_signature','signed_pending_approval','approved','signed','release_authorized'].includes(app.status))throw new Error('Rejection not allowed');
+        if(!action.reason.trim())throw new Error('Reason required');
+        await setStatus(c,actor,app,'rejected',action.reason.trim());
+        return {id:app.id};
+      }
       case 'close': {
         requireRole(actor,['owner']);
         if(app.status!=='paid_off') throw new Error('Ledger obligations must be paid off');
@@ -227,4 +234,13 @@ export async function closePaidOff(actor:Actor|null){
   let closed=0;
   for(const id of ids){await perform(actor,{type:'close',applicationId:id});closed++;}
   return {closed};
+}
+
+// A paid-off loan closes on its own once no payment is waiting for verification.
+export async function closeIfSettled(c:PoolClient,actor:Actor,applicationId:string){
+  const app=(await c.query('SELECT * FROM applications WHERE id=$1 FOR UPDATE',[applicationId])).rows[0];
+  if(app?.status!=='paid_off')return false;
+  if((await c.query(`SELECT 1 FROM payments WHERE application_id=$1 AND status='pending'`,[applicationId])).rows[0])return false;
+  await setStatus(c,actor,app,'closed','Ditutup otomatis setelah lunas dan terverifikasi');
+  return true;
 }

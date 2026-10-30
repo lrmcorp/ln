@@ -228,3 +228,9 @@ CREATE TABLE IF NOT EXISTS operating_expenses (
   recorded_by uuid NOT NULL REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS operating_expenses_month_idx ON operating_expenses(expense_month);
+-- Optional photo of the borrower's home or business taken at intake, with rounded device coordinates.
+CREATE TABLE IF NOT EXISTS intake_place (
+  application_id uuid PRIMARY KEY REFERENCES applications(id),
+  photo_cipher bytea, photo_iv bytea, photo_tag bytea, photo_mime text, photo_sha256 text,
+  latitude numeric(8,3), longitude numeric(9,3), accuracy_m integer, created_at timestamptz NOT NULL DEFAULT now()
+);

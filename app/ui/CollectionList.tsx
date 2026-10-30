@@ -3,7 +3,7 @@ import {useState} from 'react';
 import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
 import {whatsappLink} from '@/lib/whatsapp';
 
-type Item={id:string;customerName:string;phone:string|null;collectorName:string|null;remaining:number;fee:number;nextDue:{dueAt:string;amount:number}|null;dpd:number;overdueAmount:number;
+type Item={id:string;customerId:string;promiseBroken:boolean;customerName:string;phone:string|null;collectorName:string|null;remaining:number;fee:number;nextDue:{dueAt:string;amount:number}|null;dpd:number;overdueAmount:number;
   lastVisit:{outcome:string;promiseDate:string|null;note:string|null;at:string}|null;bucket:'late'|'today'|'promise'|'week'|'later'};
 const visitLabels:Record<string,string>={paid:'Bertemu, sudah bayar',promise:'Janji bayar',not_home:'Tidak di rumah',refused:'Menolak bayar',other:'Lainnya'};
 const sections:{bucket:Item['bucket'];title:string;empty:string}[]=[
@@ -18,12 +18,12 @@ function reminder(item:Item){
 
 export default function CollectionList({actor,items,week,officers,collectorId,target}:{actor:StaffActor;items:Item[];week:{start:string;end:string;due:number;collected:number;received:number}|null;officers:{id:string;name:string}[];collectorId:string;target?:{target:number;collected:number;rate:number;loans:number}|null}){
   const action=useAction();
-  const counts={late:items.filter(i=>i.bucket==='late').length,today:items.filter(i=>i.bucket==='today').length,promise:items.filter(i=>i.bucket==='promise').length};
+  const counts={late:items.filter(i=>i.bucket==='late').length,today:items.filter(i=>i.bucket==='today').length,promise:items.filter(i=>i.bucket==='promise').length,broken:items.filter(i=>i.promiseBroken).length};
   const focus=counts.late+counts.today+counts.promise;
   return <Shell actor={actor} active="tagihan">
     <PageHeader title="Tagihan hari ini" subtitle={<>{new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'full'}).format(new Date())} · {actor.role==='officer'?'Kunjungi yang terlambat lebih dulu, lalu yang jatuh tempo hari ini.':'Saring per penagih.'}</>}
       actions={actor.role==='officer'?<a className="button secondary" href="/setoran">Setor kas</a>:undefined}/>
-    <section className="focusPanel" aria-label="Fokus saat ini"><div><small>Perlu didatangi hari ini</small><strong>{focus?`${focus} nasabah · ${counts.late} terlambat`:'Semua tagihan hari ini aman'}</strong></div>
+    <section className="focusPanel" aria-label="Fokus saat ini"><div><small>Perlu didatangi hari ini</small><strong>{focus?`${focus} nasabah · ${counts.late} terlambat`:'Semua tagihan hari ini aman'}</strong>{counts.broken>0&&<small className="alertText">{counts.broken} janji bayar terlewat, ada di urutan teratas</small>}</div>
       {week&&<div className="weekTarget"><small>Angsuran minggu ini tertagih</small><strong>{money(week.collected)} dari {money(week.due)}</strong></div>}</section>
     {target&&<section className="card targetCard" aria-labelledby="target-title"><div className="cardHead"><h2 id="target-title">Target hari ini</h2><span className="muted">{target.loans} nasabah ditarget</span></div>
       <div className="meterTop"><strong>{money(target.collected)}</strong><span className="muted">dari {money(target.target)} · {target.rate.toLocaleString('id-ID')}%</span></div>
@@ -41,14 +41,14 @@ function DueCard({item,showCollector,pending,run}:{item:Item;showCollector:boole
   const [visit,setVisit]=useState(false);
   const [outcome,setOutcome]=useState('not_home');
   const wa=whatsappLink(item.phone,reminder(item));
-  const chip=item.dpd>0?<StatusChip tone="late">Terlambat {item.dpd} hari</StatusChip>:item.bucket==='today'?<StatusChip tone="due">Jatuh tempo hari ini</StatusChip>:
+  const chip=item.promiseBroken?<StatusChip tone="late">Janji bayar {shortDate(item.lastVisit?.promiseDate)} terlewat</StatusChip>:item.dpd>0?<StatusChip tone="late">Terlambat {item.dpd} hari</StatusChip>:item.bucket==='today'?<StatusChip tone="due">Jatuh tempo hari ini</StatusChip>:
     item.bucket==='promise'?<StatusChip tone="due">Janji bayar hari ini</StatusChip>:<StatusChip tone="ok">{shortDate(item.nextDue?.dueAt)}</StatusChip>;
-  return <article className="case dueCard"><div className="caseTop"><div>{chip}<h3>{displayName(item.customerName)}</h3>
+  return <article className="case dueCard"><div className="caseTop"><div>{chip}{item.promiseBroken&&item.dpd>0&&<StatusChip tone="late">Terlambat {item.dpd} hari</StatusChip>}<h3><a className="nameLink" href={`/nasabah/${item.customerId}`}>{displayName(item.customerName)}</a></h3>
       <p>{item.dpd>0?`Tertunggak ${money(item.overdueAmount)}`:`Angsuran ${money(item.nextDue?.amount)}`} · sisa {money(item.remaining)}{showCollector&&item.collectorName?` · ${displayName(item.collectorName)}`:''}</p>
       {item.lastVisit&&<p className="lastVisit">Kunjungan terakhir {shortDate(item.lastVisit.at)}: {visitLabels[item.lastVisit.outcome]}{item.lastVisit.promiseDate?` ${shortDate(item.lastVisit.promiseDate)}`:''}{item.lastVisit.note?` · ${item.lastVisit.note}`:''}</p>}</div></div>
     <div className="dueActions">{item.phone&&<a className="pillAction" href={`tel:${item.phone.replace(/[^\d+]/g,'')}`}>Telepon</a>}{wa&&<a className="pillAction" href={wa} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
       <a className="pillAction primary" href={`/pinjaman#case-${item.id}`}>Catat bayar</a><button className="pillAction" aria-expanded={visit} onClick={()=>setVisit(!visit)}>Catat kunjungan</button></div>
-    {visit&&<form className="visitForm" method="post" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);run('/api/ops',{type:'log_visit',applicationId:item.id,outcome,promiseDate:outcome==='promise'?String(f.get('promiseDate')):null,note:String(f.get('note')??'')},{success:'Kunjungan tercatat.'});}}>
+    {visit&&<form className="visitForm" method="post" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);run('/api/ops',{type:'log_visit',applicationId:item.id,outcome,promiseDate:outcome==='promise'?String(f.get('promiseDate')):null,note:String(f.get('note')??'')},{success:'Kunjungan tercatat.',offline:`Kunjungan ${displayName(item.customerName)}`});}}>
       <fieldset className="tenorChoice"><legend>Hasil kunjungan</legend>{Object.entries(visitLabels).map(([key,label])=><label key={key}><input type="radio" name="outcome" value={key} checked={outcome===key} onChange={()=>setOutcome(key)}/><span>{label}</span></label>)}</fieldset>
       {outcome==='promise'&&<label>Tanggal janji bayar<input name="promiseDate" type="date" required/></label>}
       <label>Catatan (opsional)<input name="note" maxLength={500}/></label><button disabled={pending}>Simpan kunjungan</button></form>}

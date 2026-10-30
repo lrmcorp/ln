@@ -2,7 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {pool,transaction} from './db';
 import type {Actor} from './auth';
-import {storeIntakeEvidence,type IdentityDetails} from './evidence';
+import {storeIntakeEvidence,storePlace,type IdentityDetails,type PlaceInput} from './evidence';
 import {imageMime,protect} from './protected-data';
 import {calculateFlatSchedule,jakartaToday} from './finance';
 import {monthlyTerms,weeklyRate,weeklyTerms} from './terms';
@@ -60,7 +60,7 @@ function validBirthDate(value:string){
   return !Number.isNaN(date.getTime())&&date.toISOString().startsWith(value)&&date<jakartaToday();
 }
 
-export async function createIntake(actor:Actor,input:IntakeInput,ktp:Uint8Array,liveness:Uint8Array){
+export async function createIntake(actor:Actor,input:IntakeInput,ktp:Uint8Array,liveness:Uint8Array,place:PlaceInput|null=null){
   // Officers collect what they originate; a branch manager originates for an officer of the branch, who then collects it.
   if(actor.role!=='officer'&&actor.role!=='manager')throw new Error('Forbidden');
   if(!input.name.trim()||input.name.length>200||!/^[0-9]{16}$/.test(input.nik)||!validBirthDate(input.dateOfBirth)||
@@ -96,6 +96,7 @@ export async function createIntake(actor:Actor,input:IntakeInput,ktp:Uint8Array,
     const details:IdentityDetails={nik:input.nik,dateOfBirth:input.dateOfBirth,address:input.address.trim(),motherName:input.motherName.trim(),
       bankAccountNumber:input.bankAccountNumber,accountHolder:input.accountHolder.trim(),occupation:input.occupation.trim(),loanPurpose:input.loanPurpose.trim()};
     await storeIntakeEvidence(client,application.id,details,ktp,liveness);
+    if(place)await storePlace(client,application.id,place);
     await client.query('INSERT INTO audit_events(actor_id,subject_type,subject_id,action,after_data) VALUES($1,$2,$3,$4,$5)',
       [actor.id,'application',application.id,'weekly_intake_created',JSON.stringify({principal:input.principal,weeks:input.weeks,repeatBorrower:!!existing,limit,weeklyIncome:input.weeklyIncome,policyVersion:policy.version,verificationStatus:'manual_review_required'})]);
     return {id:application.id};

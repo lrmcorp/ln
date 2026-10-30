@@ -83,7 +83,7 @@ test('early payoff waives unearned interest and releases the provision',async()=
   assert.equal(quote,500000+25000);
   await assert.rejects(recordPayment(actors.manager,id,quote-1,pngReceipt(),{earlyPayoff:true}),/Early payoff amount mismatch/);
   await recordPayment(actors.manager,id,quote,pngReceipt(),{earlyPayoff:true});
-  assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'paid_off');
+  assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'closed','a verified payoff closes the loan');
   assert.deepEqual(await balances(id),{principal:0,interest:0,unearned:0,fee:0,allowance:0});
 });
 

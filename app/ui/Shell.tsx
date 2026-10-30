@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useState,useTransition,type ReactNode} from 'react';
 import {Icon} from './icons';
+import {flushQueue,isNetworkError,offlineEvent,queueRequest,queued} from './offline';
 
 export type StaffRole='owner'|'manager'|'officer';
 export type StaffActor={id:string;name:string;role:StaffRole};
@@ -51,6 +52,21 @@ function BranchPicker({branches}:{branches:NavData['branches']}){
     <option value="">Semua cabang</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>;
 }
 
+function OfflineBanner(){
+  const [online,setOnline]=useState(true);
+  const [count,setCount]=useState(0);
+  const [note,setNote]=useState('');
+  useEffect(()=>{
+    const refresh=()=>{setOnline(navigator.onLine);queued().then(items=>setCount(items.length));};
+    const sync=async()=>{refresh();const result=await flushQueue();if(result.sent||result.failed.length){setNote([result.sent?`${result.sent} catatan terkirim.`:'',...result.failed].filter(Boolean).join(' '));if(result.sent)setTimeout(()=>window.location.reload(),1500);}refresh();};
+    sync();window.addEventListener('online',sync);window.addEventListener('offline',refresh);window.addEventListener(offlineEvent,refresh);
+    const timer=setInterval(()=>{if(navigator.onLine)sync();},30000);
+    return()=>{window.removeEventListener('online',sync);window.removeEventListener('offline',refresh);window.removeEventListener(offlineEvent,refresh);clearInterval(timer);};
+  },[]);
+  if(online&&!count&&!note)return null;
+  return <div className={`offlineBanner ${online?'':'off'}`} role="status">{!online?'Offline. Catatan kunjungan dan pembayaran disimpan di perangkat.':''}{count?` ${count} catatan menunggu dikirim.`:''}{note&&` ${note}`}</div>;
+}
+
 export function Shell({actor,active,children}:{actor:StaffActor;active:string;children:ReactNode}){
   const groups=nav[actor.role];
   const [drawer,setDrawer]=useState(false);
@@ -69,6 +85,7 @@ export function Shell({actor,active,children}:{actor:StaffActor;active:string;ch
       <header className="topbar"><button className="iconButton menuButton" onClick={()=>setDrawer(true)} aria-label="Buka menu"><Icon name="menu"/></button>
         <nav className="crumbs" aria-label="Lokasi halaman"><span>{group}</span><span aria-hidden="true">/</span><strong>{titles[active]??active}</strong></nav>
         <div className="topTools">{actor.role==='owner'&&data&&<BranchPicker branches={data.branches}/>}<Clock/></div></header>
+      <OfflineBanner/>
       <main className="page">{children}</main>
     </div>
     {actor.role==='officer'&&<nav className="bottomNav" aria-label="Menu petugas">{groups.flatMap(g=>g.items).map(item=><a key={item.key} href={item.href} aria-current={item.key===active?'page':undefined}><Icon name={item.icon}/><span>{shortLabels[item.key]??item.label}</span></a>)}</nav>}
@@ -85,7 +102,7 @@ export function useAction(){
   const [pending,startTransition]=useTransition();
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
-  type Options={hash?:string;success?:string;onDone?:(result:any)=>void};
+  type Options={hash?:string;success?:string;onDone?:(result:any)=>void;offline?:string};
   // Several requests in order as one user action; stops at the first failure and reloads so the page shows where it stopped.
   function chain(steps:{path:string;body:unknown}[],options:Options={}){
     setError('');setMessage('');
@@ -101,7 +118,13 @@ export function useAction(){
         setMessage(options.success??'Tersimpan. Memperbarui halaman…');
         if(options.hash!==undefined)window.location.hash=options.hash;
         window.location.reload();
-      }catch(cause){setError(cause instanceof Error?cause.message:'Permintaan gagal');}
+      }catch(cause){
+        // Single requests marked offline-capable wait on the device instead of failing without signal.
+        if(options.offline&&steps.length===1&&isNetworkError(cause)){
+          try{await queueRequest(steps[0].path,steps[0].body,options.offline);setMessage('Tidak ada sinyal. Tersimpan di perangkat dan dikirim otomatis saat online.');return;}catch{}
+        }
+        setError(cause instanceof Error?cause.message:'Permintaan gagal');
+      }
     });
   }
   const run=(path:string,body:unknown,options:Options={})=>chain([{path,body}],options);
