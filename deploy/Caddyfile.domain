@@ -7,9 +7,9 @@
 # AGENT_DOMAIN is a host list separated by ", ", e.g. lrmcorporation.id, www.lrmcorporation.id.
 {$AGENT_DOMAIN:agent.lnint.xyz} {
   encode zstd gzip
-  # WhatsApp Cloud API webhook, served by lrmagents' whatsapp-bridge.
-  handle /whatsapp/webhook {
-    reverse_proxy whatsapp-bridge:8080
+  # WhatsApp Web (QR) page and API, served by lrmagents' whatsapp-gateway.
+  handle /whatsapp* {
+    reverse_proxy whatsapp-gateway:8080
   }
   handle {
     reverse_proxy cowagent:9899
