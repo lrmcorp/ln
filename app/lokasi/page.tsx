@@ -8,5 +8,5 @@ export default async function Lokasi(){
   const actor=await currentActor();
   if(!actor||!['owner','manager'].includes(actor.role)) redirect('/');
   const initial=await monitorLocations(actor);
-  return <LocationMonitor role={actor.role as 'owner'|'manager'} name={actor.name==='Demo Owner'?'Pemilik Demo':actor.name==='Demo Manager'?'Manajer Demo':actor.name} initial={JSON.parse(JSON.stringify(initial))}/>;
+  return <LocationMonitor actor={{id:actor.id,name:actor.name,role:actor.role as 'owner'|'manager'}} initial={JSON.parse(JSON.stringify(initial))}/>;
 }

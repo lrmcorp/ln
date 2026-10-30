@@ -1,6 +1,6 @@
 'use client';
 import {useState} from 'react';
-import {Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
+import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
 import {whatsappLink} from '@/lib/whatsapp';
 
 type Item={id:string;customerName:string;phone:string|null;collectorName:string|null;remaining:number;fee:number;nextDue:{dueAt:string;amount:number}|null;dpd:number;overdueAmount:number;
@@ -21,7 +21,8 @@ export default function CollectionList({actor,items,week,officers,collectorId}:{
   const counts={late:items.filter(i=>i.bucket==='late').length,today:items.filter(i=>i.bucket==='today').length,promise:items.filter(i=>i.bucket==='promise').length};
   const focus=counts.late+counts.today+counts.promise;
   return <Shell actor={actor} active="tagihan">
-    <div className="intro"><div><h1>Tagihan hari ini</h1><p>{actor.role==='officer'?'Kunjungi yang terlambat lebih dulu, lalu yang jatuh tempo hari ini.':'Daftar tagihan cabang. Saring per penagih.'}</p></div><span className="date">{new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'full'}).format(new Date())}</span></div>
+    <PageHeader title="Tagihan hari ini" subtitle={<>{new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'full'}).format(new Date())} · {actor.role==='officer'?'Kunjungi yang terlambat lebih dulu, lalu yang jatuh tempo hari ini.':'Saring per penagih.'}</>}
+      actions={actor.role==='officer'?<a className="button secondary" href="/setoran">Setor kas</a>:undefined}/>
     <section className="focusPanel" aria-label="Fokus saat ini"><div><small>Perlu didatangi hari ini</small><strong>{focus?`${focus} nasabah · ${counts.late} terlambat`:'Semua tagihan hari ini aman'}</strong></div>
       {week&&<div className="weekTarget"><small>Angsuran minggu ini tertagih</small><strong>{money(week.collected)} dari {money(week.due)}</strong></div>}</section>
     {actor.role!=='officer'&&<form className="filterBar" method="get"><label>Penagih<select name="penagih" defaultValue={collectorId}><option value="">Semua penagih</option>{officers.map(o=><option key={o.id} value={o.id}>{displayName(o.name)}</option>)}</select></label><button className="secondary">Terapkan</button></form>}

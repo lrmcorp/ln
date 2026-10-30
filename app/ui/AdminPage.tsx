@@ -1,6 +1,6 @@
 'use client';
 import {useState} from 'react';
-import {Shell,StatusChip,displayName,useAction,type StaffActor} from './Shell';
+import {PageHeader,Shell,StatusChip,displayName,useAction,type StaffActor} from './Shell';
 
 type Branch={id:string;name:string;staff:number;active_loans:number};
 type User={id:string;username:string|null;email:string;name:string;role:string;active:boolean;branch_id:string|null;branch_name:string|null};
@@ -9,7 +9,7 @@ const roleNames:Record<string,string>={owner:'Pemilik',manager:'Manajer cabang',
 export default function AdminPage({actor,branches,users}:{actor:StaffActor;branches:Branch[];users:User[]}){
   const action=useAction();
   return <Shell actor={actor} active="admin">
-    <div className="intro"><div><h1>Cabang dan pengguna</h1><p>Tambah cabang, buat akun staf, atur ulang kata sandi, dan nonaktifkan akun yang tidak dipakai.</p></div></div>
+    <PageHeader title="Cabang dan pengguna" subtitle="Tambah cabang, buat akun staf, atur ulang kata sandi, dan nonaktifkan akun yang tidak dipakai."/>
     <section className="newPanel"><div><h2>Cabang</h2><ul className="plainList">{branches.map(b=><li key={b.id}><strong>{b.name}</strong> · {b.staff} staf · {b.active_loans} pinjaman aktif</li>)}</ul></div>
       <form method="post" onSubmit={e=>{e.preventDefault();action.run('/api/ops',{type:'create_branch',name:String(new FormData(e.currentTarget).get('name'))},{success:'Cabang ditambahkan.'});}}>
         <label>Nama cabang baru<input name="name" required maxLength={100}/></label><button disabled={action.pending}>Tambah cabang</button></form></section>

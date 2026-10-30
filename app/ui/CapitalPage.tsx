@@ -1,5 +1,5 @@
 'use client';
-import {Shell,money,shortDate,useAction,type StaffActor} from './Shell';
+import {PageHeader,Shell,money,shortDate,useAction,type StaffActor} from './Shell';
 import type {capitalReport} from '@/lib/admin';
 
 type Report=Awaited<ReturnType<typeof capitalReport>>;
@@ -8,7 +8,7 @@ const kinds:Record<string,string>={injection:'Setoran modal',withdrawal:'Penarik
 export default function CapitalPage({actor,report,today}:{actor:StaffActor;report:Report;today:string}){
   const action=useAction();
   return <Shell actor={actor} active="modal">
-    <div className="intro"><div><h1>Modal dan investor</h1><p>Dari mana dana berasal, berapa yang sedang dipinjamkan, dan hasilnya. Dipakai untuk laporan bulanan ke investor.</p></div></div>
+    <PageHeader title="Modal dan investor" subtitle="Dari mana dana berasal, berapa yang sedang dipinjamkan, dan hasilnya. Dipakai untuk laporan bulanan ke investor."/>
     <section className="metrics" aria-label="Posisi modal"><div><small>Modal tercatat</small><strong>{money(report.capital)}</strong><span>Pemilik dan investor</span></div>
       <div><small>Dipinjamkan</small><strong>{money(report.deployed)}</strong><span>{report.utilisation}% dari modal</span></div>
       <div><small>Kas menganggur</small><strong>{money(report.idleCash)}</strong><span>{report.inTransit?`+ ${money(report.inTransit)} tunai di petugas`:'Tidak ada tunai di petugas'}</span></div>

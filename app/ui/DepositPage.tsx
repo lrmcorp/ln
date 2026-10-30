@@ -1,5 +1,5 @@
 'use client';
-import {Shell,StatusChip,money,shortDate,useAction,type StaffActor} from './Shell';
+import {PageHeader,Shell,StatusChip,money,shortDate,useAction,type StaffActor} from './Shell';
 
 type Data={today:string;expectedToday:number;history:{id:string;deposit_date:string;amount:string;expected:string;status:string;review_note:string|null}[];undeposited:{day:string;total:number}[]};
 const statusLabel:Record<string,{label:string;tone:'pending'|'ok'|'late'}>={pending:{label:'Menunggu konfirmasi',tone:'pending'},confirmed:{label:'Dikonfirmasi',tone:'ok'},rejected:{label:'Ditolak, kirim ulang',tone:'late'}};
@@ -9,7 +9,7 @@ export default function DepositPage({actor,data}:{actor:StaffActor;data:Data}){
   const owed=data.undeposited.reduce((sum,row)=>sum+row.total,0);
   const defaultDay=data.undeposited.at(-1)?.day??data.today;
   return <Shell actor={actor} active="setoran">
-    <div className="intro"><div><h1>Setoran kas</h1><p>Setor tunai yang Anda tagih ke rekening perusahaan setiap hari, lalu unggah bukti setornya.</p></div></div>
+    <PageHeader title="Setoran kas" subtitle="Setor tunai yang Anda tagih ke rekening perusahaan setiap hari, lalu unggah bukti setornya."/>
     <section className="focusPanel" aria-label="Fokus saat ini"><div><small>Tunai belum disetor</small><strong>{money(owed)}{data.undeposited.length>1?` dari ${data.undeposited.length} hari`:''}</strong></div><div className="weekTarget"><small>Belum disetor dari hari ini</small><strong>{money(data.expectedToday)}</strong></div></section>
     <section className="newPanel"><div><h2>Kirim setoran</h2><p>Setor sisa tunai per tanggal tagih. Jika setoran kurang, kirim setoran tambahan; selisih terlihat oleh manajer.</p>
       {data.undeposited.length>0&&<ul className="plainList">{data.undeposited.map(row=><li key={row.day}>{shortDate(row.day)}: {money(row.total)}</li>)}</ul>}</div>

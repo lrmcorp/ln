@@ -6,7 +6,7 @@ import {weekBounds} from './collections';
 
 export type ReportFilter={branchId?:string|null;collectorId?:string|null};
 
-function scope(actor:Actor,filter:ReportFilter){
+export function scope(actor:Actor,filter:ReportFilter){
   requireRole(actor,['owner','manager']);
   const params:unknown[]=[];
   const parts:string[]=[];
@@ -16,11 +16,11 @@ function scope(actor:Actor,filter:ReportFilter){
   return {params,where:parts.length?`AND ${parts.join(' AND ')}`:''};
 }
 
-type LoanRow={id:string;status:string;branch_id:string;branch_name:string;collector_id:string;collector_name:string;customer_name:string;
+export type LoanRow={id:string;status:string;branch_id:string;branch_name:string;collector_id:string;collector_name:string;customer_name:string;
   principal:number;interest:number;disbursed_at:string|null;paid:number;collected_total:number;recovery:number;
   outstanding_principal:number;receivable:number;rows:{dueAt:string;amount:number}[]};
 
-async function loans(actor:Actor,filter:ReportFilter):Promise<LoanRow[]>{
+export async function loans(actor:Actor,filter:ReportFilter):Promise<LoanRow[]>{
   const {params,where}=scope(actor,filter);
   const rows=(await pool.query(`SELECT a.id,a.status,a.branch_id,b.name AS branch_name,COALESCE(a.collector_id,a.officer_id) AS collector_id,u.name AS collector_name,c.name AS customer_name,
       COALESCE(a.approved_principal,0)::bigint AS principal,COALESCE(a.interest_amount,0)::bigint AS interest,to_char(a.disbursed_at AT TIME ZONE 'Asia/Jakarta','YYYY-MM-DD') AS disbursed_at,
@@ -37,17 +37,17 @@ async function loans(actor:Actor,filter:ReportFilter):Promise<LoanRow[]>{
 }
 
 // Remaining amount per installment row after applying what was paid toward the schedule.
-function openRows(loan:LoanRow){
+export function openRows(loan:LoanRow){
   let cumulative=0;
   return loan.rows.map(row=>{const before=cumulative;cumulative+=Number(row.amount);return {dueAt:row.dueAt,open:Math.max(0,cumulative-Math.max(before,loan.paid))};});
 }
-function dpdOf(loan:LoanRow,today:string){
+export function dpdOf(loan:LoanRow,today:string){
   if(loan.status!=='active')return 0;
   const first=openRows(loan).find(row=>row.open>0);
   return first&&first.dueAt<today?daysBetween(first.dueAt,today):0;
 }
 
-const pct=(part:number,whole:number)=>whole?Math.round(part/whole*1000)/10:0;
+export const pct=(part:number,whole:number)=>whole?Math.round(part/whole*1000)/10:0;
 
 export async function portfolioReport(actor:Actor,filter:ReportFilter={}){
   await runPortfolioAccruals();

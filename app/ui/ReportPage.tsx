@@ -1,5 +1,5 @@
 'use client';
-import {Shell,StatusChip,displayName,money,shortDate,type StaffActor} from './Shell';
+import {PageHeader,Shell,StatusChip,displayName,money,shortDate,type StaffActor} from './Shell';
 import type {portfolioReport} from '@/lib/reports';
 
 type Report=Awaited<ReturnType<typeof portfolioReport>>;
@@ -9,7 +9,7 @@ export default function ReportPage({actor,report,officers,branches,filter}:{acto
   const csv=(kind:string)=>`/api/reports/csv?kind=${kind}${query.size?`&${query}`:''}`;
   const par=[{label:'Terlambat 1+ hari',data:report.par1},{label:'Terlambat 7+ hari',data:report.par7},{label:'Terlambat 30+ hari',data:report.par30}];
   return <Shell actor={actor} active="laporan">
-    <div className="intro"><div><h1>Laporan portofolio</h1><p>Kesehatan pinjaman, tagihan minggu ini, arus kas, dan kinerja penagih. Angka dihitung dari buku besar.</p></div><span className="date">Per {shortDate(report.today)}</span></div>
+    <PageHeader title="Laporan portofolio" subtitle={`Per ${shortDate(report.today)} · Kesehatan pinjaman, tagihan minggu ini, arus kas, dan kinerja penagih dari buku besar.`}/>
     <form className="filterBar" method="get">{actor.role==='owner'&&<label>Cabang<select name="cabang" defaultValue={filter.branchId}><option value="">Semua cabang</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}
       <label>Penagih<select name="penagih" defaultValue={filter.collectorId}><option value="">Semua penagih</option>{officers.map(o=><option key={o.id} value={o.id}>{displayName(o.name)}</option>)}</select></label><button className="secondary">Terapkan</button></form>
     <section className="metrics" aria-label="Indikator utama"><div><small>Pokok beredar</small><strong>{money(report.outstanding)}</strong><span>{report.activeCount} pinjaman aktif</span></div>

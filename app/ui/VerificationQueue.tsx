@@ -1,5 +1,5 @@
 'use client';
-import {Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
+import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
 
 type Queue={payments:{id:string;application_id:string;amount:string;method:string;amount_source:string;bank_reference:string|null;created_at:string;early_payoff:boolean;own:boolean;customer_name:string;recorded_by:string;branch_name:string}[];
   deposits:{id:string;deposit_date:string;amount:string;expected:string;created_at:string;officer_name:string;branch_name:string}[];
@@ -13,7 +13,7 @@ export default function VerificationQueue({actor,queue}:{actor:StaffActor;queue:
     action.run('/api/ops',type==='reject_payment'?{type,paymentId:id,note}:{type,depositId:id,approve:false,note},{success:'Ditolak.'});
   }
   return <Shell actor={actor} active="verifikasi">
-    <div className="intro"><div><h1>Verifikasi</h1><p>Cocokkan bukti dengan mutasi bank atau kas yang diterima. Pencatat tidak dapat memverifikasi catatannya sendiri.</p></div></div>
+    <PageHeader title="Verifikasi" subtitle="Cocokkan bukti dengan mutasi bank atau kas yang diterima. Pencatat tidak dapat memverifikasi catatannya sendiri."/>
     <section className="focusPanel" aria-label="Fokus saat ini"><div><small>Menunggu verifikasi</small><strong>{queue.payments.length} pembayaran · {queue.deposits.length} setoran kas</strong></div></section>
     <section className="register" aria-labelledby="pending-payments"><div className="sectionHead"><div><h2 id="pending-payments">Pembayaran</h2><p>Dicatat petugas atau dibaca otomatis dari bukti</p></div></div>
       {queue.payments.length===0?<div className="empty">Tidak ada pembayaran yang menunggu.</div>:<div className="caseList">{queue.payments.map(p=><article key={p.id} className="case"><div className="caseTop"><div>
