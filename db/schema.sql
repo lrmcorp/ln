@@ -16,6 +16,8 @@ DO $$ BEGIN
     ALTER TABLE users ADD CONSTRAINT users_customer_fk FOREIGN KEY (customer_id) REFERENCES customers(id);
   END IF;
 END $$;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username text;
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_idx ON users(lower(username));
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('owner','manager','officer','customer'));
 CREATE TABLE IF NOT EXISTS policy_versions (

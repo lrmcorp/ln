@@ -18,7 +18,7 @@ npm run build
 npm run dev
 ```
 
-Buka aplikasi pada port lokal yang ditampilkan Next.js. Akun demo adalah `owner@local.test`, `manager@local.test`, `officer@local.test`, dan `customer@local.test`. Gunakan kata sandi masing-masing dari `.env.local`. Nasabah contoh terhubung ke akun `customer@local.test`. Gunakan hanya data nasabah dan bank rekaan.
+Buka aplikasi pada port lokal yang ditampilkan Next.js. Masuk dengan **nama pengguna** atau email: `owner` (pemilik/superadmin), `manager` (manajer cabang), `officer` (petugas lapangan), dan `customer` (nasabah), atau `<nama>@local.test`. Secara lokal kata sandinya diambil dari `.env.local`; jalankan `DEMO_SHARED_PASSWORD=12345678 npm run db:seed` untuk memakai satu kata sandi bersama. Di server demo (`https://int.lnint.xyz`) semua akun demo memakai kata sandi `12345678`. Nasabah contoh terhubung ke akun `customer`. Gunakan hanya data nasabah dan bank rekaan.
 
 `.env.example` berisi contoh konfigurasi. Jika `.env.local` berasal dari versi lama, `npm run env:init` menambahkan kata sandi manajer dan kunci enkripsi demo tanpa mengganti kredensial lain. Jangan unggah `.env.local` ke Git. Simpan cadangan kunci enkripsi secara aman; kehilangan kunci membuat bukti lama tidak dapat dibaca. Pengaturan adaptor demo mengaktifkan simulasi tanda tangan dan konfirmasi bank. Tanpanya, kedua tindakan tersebut ditolak sampai layanan terverifikasi tersedia.
 

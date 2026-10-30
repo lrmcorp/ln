@@ -22,6 +22,9 @@ services:
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
     env_file: ../.env.vps
+    environment:
+      # Synthetic demo only: every demo account (owner, manager, officer, customer) uses this password.
+      DEMO_SHARED_PASSWORD: "12345678"
     depends_on:
       postgres:
         condition: service_healthy
