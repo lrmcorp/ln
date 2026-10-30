@@ -1,7 +1,7 @@
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
 import {currentActor} from '@/lib/auth';
-import {readReceiptForPayment} from '@/lib/workflow';
+import {readReceiptForPayment} from '@/lib/payments';
 
 export async function POST(request:Request){
   const origin=request.headers.get('origin');

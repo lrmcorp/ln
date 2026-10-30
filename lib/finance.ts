@@ -38,11 +38,13 @@ export function calculateMonthlySchedule(principal:number,bps:number,months:numb
   return {interest,total:principal+interest,installments};
 }
 
-export function allocatePayment(amount:number, remainingPrincipal:number, remainingInterest:number) {
-  if (![amount,remainingPrincipal,remainingInterest].every(Number.isSafeInteger) || amount<=0 || remainingPrincipal<0 || remainingInterest<0) throw new Error('Invalid payment');
-  if (amount > remainingPrincipal+remainingInterest) throw new Error('Overpayment requires review');
-  const interest=Math.min(amount,remainingInterest);
-  return {interest,principal:amount-interest};
+// Late fees are settled first, then interest, then principal.
+export function allocatePayment(amount:number, remainingPrincipal:number, remainingInterest:number, remainingFee=0) {
+  if (![amount,remainingPrincipal,remainingInterest,remainingFee].every(Number.isSafeInteger) || amount<=0 || remainingPrincipal<0 || remainingInterest<0 || remainingFee<0) throw new Error('Invalid payment');
+  if (amount > remainingPrincipal+remainingInterest+remainingFee) throw new Error('Overpayment requires review');
+  const fee=Math.min(amount,remainingFee);
+  const interest=Math.min(amount-fee,remainingInterest);
+  return {fee,interest,principal:amount-fee-interest};
 }
 
 export function assertBalanced(lines:{debit:number;credit:number}[]) {

@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS applications (
   policy_id uuid REFERENCES policy_versions(id), requested_principal bigint NOT NULL,
   approved_principal bigint, interest_amount bigint, term_weeks integer, term_months integer,
   repayment_frequency text NOT NULL DEFAULT 'weekly' CHECK (repayment_frequency IN ('weekly','monthly_first')),
-  status text NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','awaiting_signature','signed_pending_approval','rejected','approved','signed','release_authorized','transfer_initiated','active','paid_off','closed')),
+  status text NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','awaiting_signature','signed_pending_approval','rejected','approved','signed','release_authorized','transfer_initiated','active','paid_off','closed','written_off')),
   exception_reason text, submitted_at timestamptz NOT NULL DEFAULT now(), approved_at timestamptz,
   CHECK (requested_principal > 0)
 );
@@ -46,7 +46,7 @@ ALTER TABLE applications ALTER COLUMN term_weeks DROP NOT NULL;
 ALTER TABLE applications ADD COLUMN IF NOT EXISTS term_months integer;
 ALTER TABLE applications ADD COLUMN IF NOT EXISTS repayment_frequency text NOT NULL DEFAULT 'weekly';
 ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check;
-ALTER TABLE applications ADD CONSTRAINT applications_status_check CHECK (status IN ('submitted','awaiting_signature','signed_pending_approval','rejected','approved','signed','release_authorized','transfer_initiated','active','paid_off','closed'));
+ALTER TABLE applications ADD CONSTRAINT applications_status_check CHECK (status IN ('submitted','awaiting_signature','signed_pending_approval','rejected','approved','signed','release_authorized','transfer_initiated','active','paid_off','closed','written_off'));
 ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS weekly_rates jsonb NOT NULL DEFAULT '[{"weeks":4,"rateBps":2000},{"weeks":5,"rateBps":2500},{"weeks":6,"rateBps":3000}]';
 ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_repayment_frequency_check;
 ALTER TABLE applications ADD CONSTRAINT applications_repayment_frequency_check CHECK (repayment_frequency IN ('weekly','monthly_first','weekly_from_approval'));
@@ -146,3 +146,75 @@ CREATE INDEX IF NOT EXISTS mobile_enrollments_customer_idx ON mobile_enrollments
 CREATE INDEX IF NOT EXISTS applications_officer_idx ON applications(officer_id,status);
 CREATE INDEX IF NOT EXISTS applications_branch_idx ON applications(branch_id,status);
 CREATE INDEX IF NOT EXISTS audit_subject_idx ON audit_events(subject_type,subject_id);
+
+-- 2026-10-30: collections, verification, accounting, reporting, administration.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS weekly_income bigint;
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS first_loan_max bigint NOT NULL DEFAULT 1000000;
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS repeat_growth_bps integer NOT NULL DEFAULT 5000;
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS max_installment_income_bps integer NOT NULL DEFAULT 3500;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS collector_id uuid REFERENCES users(id);
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS weekly_income bigint;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS interest_deferred boolean NOT NULL DEFAULT false;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS fee_accrued_through date;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS max_dpd integer NOT NULL DEFAULT 0;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS disbursed_at timestamptz;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS written_off_at timestamptz;
+ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check;
+ALTER TABLE applications ADD CONSTRAINT applications_status_check CHECK (status IN ('submitted','awaiting_signature','signed_pending_approval','rejected','approved','signed','release_authorized','transfer_initiated','active','paid_off','closed','written_off'));
+ALTER TABLE installments ADD COLUMN IF NOT EXISTS interest_recognized boolean NOT NULL DEFAULT false;
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'original';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS fee bigint NOT NULL DEFAULT 0;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS recovery bigint NOT NULL DEFAULT 0;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS method text NOT NULL DEFAULT 'transfer';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'verified';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES users(id);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS reviewed_at timestamptz;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS review_note text;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS early_payoff boolean NOT NULL DEFAULT false;
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_method_check;
+ALTER TABLE payments ADD CONSTRAINT payments_method_check CHECK (method IN ('transfer','cash'));
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check;
+ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('pending','verified','rejected'));
+ALTER TABLE journals ALTER COLUMN application_id DROP NOT NULL;
+CREATE TABLE IF NOT EXISTS late_fee_accruals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL REFERENCES applications(id),
+  from_date date NOT NULL, through_date date NOT NULL, days integer NOT NULL, amount bigint NOT NULL CHECK (amount >= 0),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS provision_adjustments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL REFERENCES applications(id),
+  dpd integer NOT NULL, target bigint NOT NULL, delta bigint NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS collection_visits (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL REFERENCES applications(id),
+  officer_id uuid NOT NULL REFERENCES users(id),
+  outcome text NOT NULL CHECK (outcome IN ('paid','promise','not_home','refused','other')),
+  promise_date date, note text, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS collection_visits_app_idx ON collection_visits(application_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS cash_deposits (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), officer_id uuid NOT NULL REFERENCES users(id),
+  branch_id uuid NOT NULL REFERENCES branches(id), deposit_date date NOT NULL,
+  amount bigint NOT NULL CHECK (amount >= 0), expected bigint NOT NULL,
+  proof_cipher bytea NOT NULL, proof_iv bytea NOT NULL, proof_tag bytea NOT NULL, proof_mime text NOT NULL, proof_sha256 text UNIQUE NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','rejected')),
+  reviewed_by uuid REFERENCES users(id), reviewed_at timestamptz, review_note text,
+  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(officer_id,deposit_date)
+);
+CREATE TABLE IF NOT EXISTS capital_movements (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), kind text NOT NULL CHECK (kind IN ('injection','withdrawal','distribution')),
+  source text NOT NULL, source_type text NOT NULL CHECK (source_type IN ('owner','investor')),
+  amount bigint NOT NULL CHECK (amount > 0), annual_cost_bps integer NOT NULL DEFAULT 0, movement_date date NOT NULL,
+  note text, recorded_by uuid NOT NULL REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payments_app_status_idx ON payments(application_id,status);
+CREATE INDEX IF NOT EXISTS applications_collector_idx ON applications(collector_id,status);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS waived_interest bigint NOT NULL DEFAULT 0;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS written_off_amount bigint NOT NULL DEFAULT 0;
+-- A source document can produce several journals (a payment and its reversal); uniqueness is per event type.
+ALTER TABLE journals DROP CONSTRAINT IF EXISTS journals_source_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS journals_event_source_idx ON journals(event_type,source_id);
+-- Several deposits per day are allowed so an officer can settle a shortfall later the same day.
+ALTER TABLE cash_deposits DROP CONSTRAINT IF EXISTS cash_deposits_officer_id_deposit_date_key;
+CREATE INDEX IF NOT EXISTS cash_deposits_officer_day_idx ON cash_deposits(officer_id,deposit_date);

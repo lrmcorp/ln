@@ -8,3 +8,4 @@ coverage
 *.tsbuildinfo
 android-customer/.gradle
 android-customer/app/build
+flutter-customer

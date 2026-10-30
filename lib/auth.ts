@@ -33,7 +33,7 @@ export function parseSession(token:string|undefined){
 export async function currentActor():Promise<Actor|null>{
   const id=parseSession((await cookies()).get('ln_session')?.value);
   if(!id)return null;
-  const result=await pool.query<Actor>('SELECT id,name,email,role,branch_id,customer_id FROM users WHERE id=$1',[id]);
+  const result=await pool.query<Actor>('SELECT id,name,email,role,branch_id,customer_id FROM users WHERE id=$1 AND active',[id]);
   return result.rows[0]??null;
 }
 export function requireRole(actor:Actor|null,roles:Actor['role'][]):asserts actor is Actor {

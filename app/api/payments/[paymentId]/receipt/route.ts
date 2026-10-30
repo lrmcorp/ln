@@ -1,5 +1,5 @@
 import {currentActor} from '@/lib/auth';
-import {readPaymentReceipt} from '@/lib/workflow';
+import {readPaymentReceipt} from '@/lib/payments';
 
 export async function GET(_request:Request,{params}:{params:Promise<{paymentId:string}>}){
   const actor=await currentActor();

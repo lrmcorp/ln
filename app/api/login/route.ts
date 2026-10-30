@@ -9,7 +9,7 @@ export async function POST(request:Request){
     const login=typeof body.login==='string'?body.login:body.email;
     if(typeof login!=='string'||typeof body.password!=='string') throw new Error('Nama pengguna dan kata sandi wajib diisi');
     const id=login.toLowerCase().trim();
-    const result=await pool.query('SELECT id,password_hash FROM users WHERE email=$1 OR lower(username)=$1 LIMIT 1',[id]);
+    const result=await pool.query('SELECT id,password_hash FROM users WHERE (email=$1 OR lower(username)=$1) AND active LIMIT 1',[id]);
     const user=result.rows[0];
     if(!user||!verifyPassword(body.password,user.password_hash)) return NextResponse.json({error:'Nama pengguna atau kata sandi salah'},{status:401});
     const response=NextResponse.json({ok:true});

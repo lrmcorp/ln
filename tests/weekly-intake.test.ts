@@ -6,7 +6,8 @@ import {pool} from '../lib/db';
 import type {Actor} from '../lib/auth';
 import {createIntake,signApplication,signingPreview} from '../lib/intake';
 import {readIntakeEvidence} from '../lib/evidence';
-import {perform,readPaymentReceipt,recordPayment} from '../lib/workflow';
+import {perform} from '../lib/workflow';
+import {readPaymentReceipt,recordPayment,verifyPayment} from '../lib/payments';
 import {jakartaToday} from '../lib/finance';
 import {stopReceiptReader} from '../lib/receipt-reader';
 
@@ -24,7 +25,7 @@ test('weekly intake starts installments at approval and staff record receipted p
   const ktp=Buffer.from([255,216,255,...Array(20).fill(0),255,217]);
   const video=Buffer.from([26,69,223,163,...Array(20).fill(0)]);
   const details={name:'Nasabah Uji Mingguan',nik,dateOfBirth:'1990-01-01',phone:'081234567890',address:'Alamat rekaan',motherName:'Ibu Rekaan',
-    bankName:'Bank Demo',bankAccountNumber:'1234567890',accountHolder:'Nasabah Uji Mingguan',occupation:'',loanPurpose:''};
+    bankName:'Bank Demo',bankAccountNumber:'1234567890',accountHolder:'Nasabah Uji Mingguan',occupation:'',loanPurpose:'',weeklyIncome:2000000};
   await assert.rejects(createIntake(officer,{...details,principal:500000,weeks:7},ktp,video),/Outside policy limits/);
   const {id}=await createIntake(officer,{...details,principal:500000,weeks:5},ktp,video);
   await assert.rejects(perform(owner,{type:'approve',applicationId:id}),/Approval not allowed/);
@@ -48,23 +49,29 @@ test('weekly intake starts installments at approval and staff record receipted p
   await perform(owner,{type:'initiate',applicationId:id,idempotencyKey:randomUUID()});
   await perform(owner,{type:'confirm',applicationId:id,bankReference:`${Date.now()}`,proof:'Bukti penyelesaian demo'});
   const first=receipt();
-  const paid=await recordPayment(manager,id,100000,null,first);
+  const paid=await recordPayment(manager,id,100000,first);
   assert.equal(paid.remaining,525000);
-  await assert.rejects(recordPayment(manager,id,100000,null,first),/duplicate key/);
-  await assert.rejects(recordPayment({...manager,branch_id:randomUUID()},id,100000,null,receipt()),/Forbidden/);
+  await assert.rejects(recordPayment(manager,id,100000,first),/duplicate key/);
+  await assert.rejects(recordPayment({...manager,branch_id:randomUUID()},id,100000,receipt()),/Forbidden/);
   await assert.rejects(readPaymentReceipt({...manager,branch_id:randomUUID()},paid.paymentId),/Forbidden/);
   assert.deepEqual((await readPaymentReceipt(manager,paid.paymentId)).data,first);
-  await assert.rejects(recordPayment(manager,id,525001,null,receipt()),/Overpayment/);
+  await assert.rejects(recordPayment(manager,id,525001,receipt()),/Overpayment/);
   // Field officer: blank nominal is read from the receipt photo (trailing bytes keep each run's receipt hash unique).
   const photo=Buffer.concat([readFileSync(new URL('./fixtures/receipt-kwitansi.png',import.meta.url)),Buffer.from(randomUUID())]);
-  await assert.rejects(recordPayment({...officer,id:randomUUID()},id,null,null,photo),/Unassigned application/);
-  await assert.rejects(recordPayment(officer,id,null,null,Buffer.concat([Buffer.from('%PDF-1.4\n'),Buffer.from(randomUUID())])),/Receipt amount unreadable/);
-  const auto=await recordPayment(officer,id,null,null,photo);
+  await assert.rejects(recordPayment({...officer,id:randomUUID()},id,null,photo),/Unassigned application/);
+  await assert.rejects(recordPayment(officer,id,null,Buffer.concat([Buffer.from('%PDF-1.4\n'),Buffer.from(randomUUID())])),/Receipt amount unreadable/);
+  const auto=await recordPayment(officer,id,null,photo);
   assert.equal(auto.amount,125000);
   assert.equal(auto.amountSource,'read_auto');
   assert.deepEqual((await readPaymentReceipt(officer,auto.paymentId)).data,photo);
-  await recordPayment(officer,id,400000,`TRF-${randomUUID()}`,receipt(),'read_confirmed');
+  await recordPayment(officer,id,400000,receipt(),{reference:`TRF-${randomUUID()}`,source:'read_confirmed'});
   assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'paid_off');
   await assert.rejects(perform(manager,{type:'close',applicationId:id}),/Forbidden/);
+  // Officer and auto-read payments wait for the manager; the recorder cannot verify their own entry.
+  await assert.rejects(perform(owner,{type:'close',applicationId:id}),/Payments awaiting verification/);
+  const pending=(await pool.query(`SELECT id FROM payments WHERE application_id=$1 AND status='pending'`,[id])).rows;
+  assert.equal(pending.length,2);
+  await assert.rejects(verifyPayment(officer,pending[0].id),/Forbidden/);
+  for(const row of pending)await verifyPayment(manager,row.id);
   await perform(owner,{type:'close',applicationId:id});
 });

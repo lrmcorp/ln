@@ -70,3 +70,42 @@ h1,h2{text-wrap:balance}
 .newPanel .rateTable{grid-column:1/-1}.rateRow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end;margin-bottom:8px}.rateRow label{margin:0}.newPanel form .rateRow .textButton,.newPanel form .rateTable>.textButton{grid-column:auto;min-height:44px}
 .paymentForm .readNote{color:var(--ink);font-weight:600}
 @media(max-width:620px){.repayment{padding:0 20px 18px}}
+/* 2026-10-30 operations UI. Status chips always carry text; amber marks "due", red "late", green "on track". */
+:root{--warn:#7a4f00;--warn-soft:#f6ead2;--alert-soft:#f6e3df}
+.rail a[aria-current=page]{background:var(--soft);font-weight:700;color:var(--accent)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;padding:3px 9px;border-radius:999px;margin:0 6px 8px 0;line-height:1.4;white-space:nowrap}
+.chip-late{background:var(--alert-soft);color:var(--alert)}.chip-due{background:var(--warn-soft);color:var(--warn)}.chip-ok{background:var(--soft);color:var(--accent)}
+.chip-neutral{background:var(--paper);color:var(--muted);border:1px solid var(--line)}.chip-pending{background:var(--surface);color:var(--ink);border:1px dashed var(--muted)}
+.caseAmount small{color:var(--muted);font-size:.74rem}
+.sectionHead{flex-wrap:wrap;gap:12px}.searchBox{margin:0;min-width:220px}.searchBox input{min-height:42px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 14px;scrollbar-width:thin}.tab{background:var(--surface)!important;color:var(--ink)!important;border:1px solid var(--line)!important;border-radius:999px!important;padding:8px 14px!important;font-weight:600;white-space:nowrap;min-height:40px}
+.tab.active{background:var(--ink)!important;color:var(--surface)!important;border-color:var(--ink)!important}.tab:hover{transform:none!important}
+button.secondary{background:var(--surface);color:var(--accent);border:1px solid var(--accent)}button.danger{background:var(--alert);color:var(--surface)}
+.filterBar{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:0 0 26px}.filterBar label{margin:0;min-width:200px}
+.focusPanel .weekTarget small,.focusPanel .weekTarget strong{display:block}.focusPanel .weekTarget{text-align:right}
+.dueActions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 28px 22px}.dueActions p{margin:0;font-size:.85rem}
+.pillAction{display:inline-flex;align-items:center;min-height:42px;padding:0 15px;border-radius:999px;border:1px solid var(--line);background:var(--surface)!important;color:var(--ink)!important;font-weight:650;text-decoration:none;font-size:.88rem}
+.pillAction.primary{background:var(--accent)!important;color:var(--accent-ink)!important;border-color:var(--accent)}button.pillAction:hover{transform:none}
+.lastVisit{margin-top:6px!important;color:var(--ink)!important}
+.visitForm{padding:0 28px 24px;display:grid;gap:12px}.visitForm label{margin:0}
+.inlineForm{display:flex!important;flex-wrap:wrap;align-items:end;gap:10px}
+.ownerTools{margin:12px 0 0;background:var(--paper);border-radius:9px;padding:14px 16px}.ownerTools form{margin-top:14px}
+.payoffOffer{width:100%}.payoffOffer .signingCheck{margin:0}
+.metrics .metricAlert{border-top-color:var(--alert)}.metrics .metricAlert strong{color:var(--alert)}.metrics span a{color:var(--accent)}
+.metrics.compact{margin-bottom:40px}.reportNote{font-size:.85rem;margin:-40px 0 46px}
+.reportTable table{min-width:640px}.reportTable td,.reportTable th{white-space:nowrap}
+.limitNote{background:var(--soft);padding:12px 14px;border-radius:8px;font-size:.88rem;color:var(--ink)}
+.plainList{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:6px;font-size:.88rem}
+.bottomNav{display:none}
+@media(max-width:620px){
+  .dueActions,.visitForm{padding-left:20px;padding-right:20px}
+  .searchBox{min-width:0;width:100%}.filterBar label{min-width:0;flex:1 1 100%}
+  .focusPanel .weekTarget{text-align:left;margin-top:12px}
+  .reportNote{margin-top:-28px}
+  .role-officer .rail{display:none}.role-officer .workspace{padding-bottom:96px}
+  .bottomNav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .bottomNav a{display:flex;align-items:center;justify-content:center;min-height:52px;font-size:.8rem;font-weight:650;color:var(--muted);text-decoration:none;border-radius:8px}
+  .bottomNav a[aria-current=page]{color:var(--accent);background:var(--soft)}
+  .role-officer .feedback{bottom:84px}
+}
+button.pillAction{border:1px solid var(--line)}button.pillAction.primary{border-color:var(--accent)}

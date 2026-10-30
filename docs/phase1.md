@@ -1,5 +1,17 @@
 # Product and technical design
 
+## Operations, accounting and reporting update (2026-10-30)
+
+Implemented after the business review (legal structure, the customer screen, and password/MFA hardening were explicitly deferred by the user):
+- **Maker-checker:** payments recorded by officers or read by OCR are `pending` until a manager (same branch) or the owner verifies them; the recorder cannot verify their own entry. Rejection posts a reversing journal and reopens a paid-off loan. Closure is blocked while payments are pending.
+- **Cash handling:** cash payments debit `cash_in_transit`; an officer's daily `cash_deposits` row (amount, proof) is compared with recorded cash, and confirmation moves the deposited amount to `cash`. Shortfalls stay visible in transit.
+- **Collections:** `applications.collector_id` (defaults to the originator) assigned by manager/owner; `/tagihan` buckets loans into late, due today, promise due, next 7 days; `collection_visits` log outcomes and promise dates (within 14 days); WhatsApp reminder links.
+- **Credit rules:** repeat borrowers are matched by NIK hash within the branch; open or written-off loans block a new loan; limit = first-loan cap, raised by the growth rate after an on-time payoff (max DPD 0), kept after a 1-7 day slip, reset after worse. The largest weekly installment must be within the policy share of declared weekly income.
+- **Accounting (lib/accounting.ts, lib/ledger.ts):** disbursement credits `unearned_interest`; `runAccruals` (idempotent, per loan, triggered by page loads and every payment) recognises each installment's interest on its due date (capped at the unearned balance), accrues late fees daily on original principal (total capped at principal), records worst DPD, and sets `loan_loss_allowance` by DPD bucket (1/5/25/50/100%). Payments allocate fee, interest, principal. Write-off (owner, DPD ≥ 30) clears receivables against unearned interest, the allowance and `bad_debt_expense`; later receipts are `recovery_income`. Early payoff waives unearned interest. Restructuring (owner) creates an unsigned agreement version; the borrower signs on the officer's device, then the schedule is rebuilt as one settled row plus new weekly rows. Journal uniqueness is per `(event_type, source_id)`.
+- **Reports (lib/reports.ts):** PAR 1/7/30 on outstanding principal, collection efficiency (per loan, payments count only up to that week's dues), 12-week cash flow (8 actual, 4 expected), vintage by disbursement week, per-collector performance, CSV export (semicolon, BOM) for Excel.
+- **Administration (lib/admin.ts):** branches, staff users (username, role, branch, password reset, deactivate; inactive users cannot sign in or keep sessions), capital movements (`owner_capital`, `investor_capital`, `capital_distributions`; withdrawals cannot exceed cash) and a capital report.
+- **Flutter:** `flutter-customer/` reuses the native Keystore store and location service through a MethodChannel; APK built by GitHub Actions.
+
 ## Weekly repayment update (2026-10-27)
 
 This supersedes the monthly schedule below. New intake is weekly: the officer picks a tenor from the policy's weekly rate table (default 4 weeks 20%, 5 weeks 25%, 6 weeks 30%; the owner can edit, add, or remove rows, 1 to 52 weeks and 0 to 100%). Interest is `round_half_up(principal × rate)` on top of principal; principal and interest are split evenly across weeks with remainders on the earliest weeks. The borrower signs the amounts and the rule "first installment 7 days after owner approval, then every 7 days"; owner approval creates the dated installments and checks that they match the signed amounts. The assigned field officer, branch manager, or owner records each repayment with a required JPG/PNG/PDF receipt (encrypted, SHA-256 unique) and an optional reference. The amount is optional: `lib/receipt-reader.ts` runs tesseract.js on the server (Indonesian and English models from npm, no network) and picks the labelled, currency-marked figure while skipping fees, balances, references, and dates. The form pre-fills the read amount for confirmation (`read_confirmed`); a blank amount at save is read server-side and stored as `read_auto` for owner review. PDFs are never read. Payments still allocate interest first in the ledger; the UI shows paid versus total due, remaining amount, per-week status, and arrears through today's Jakarta date. Late fees remain described but not accrued. Older monthly applications keep their monthly terms.
@@ -64,7 +76,11 @@ The schema is in `db/schema.sql`. Customer NIK is reduced to a keyed duplicate-d
 | Approve application | Yes | No | No | No |
 | Simulate signature through internal API | No | No | No | Yes; no customer UI |
 | Authorize, initiate, confirm transfer | Yes | No | No | No |
-| Record repayment with receipt | Yes | Own branch | Own assigned loans | No |
+| Record repayment with receipt | Yes (verified on entry) | Own branch (verified on entry) | Own or collected loans (pending) | No |
+| Verify or reject pending payments and cash deposits | Yes | Own branch | No | No |
+| Assign collector, view reports | Yes | Own branch | No | No |
+| Write off, restructure, manage branches/users/capital | Yes | No | No | No |
+| Log collection visits | No | Own branch | Own collected loans | No |
 | View payment receipt | Yes | Own branch | Own assigned loans | No |
 | Close paid-off loan | Yes | No | No | No |
 

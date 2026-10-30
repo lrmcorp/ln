@@ -42,7 +42,9 @@ test('weekly terms add the tenor rate on top of principal and leave dates to app
   assert.deepEqual(normalizeWeeklyRates([{weeks:8,rateBps:4000},{weeks:2,rateBps:1000}]).map(item=>item.weeks),[2,8]);
 });
 test('payments allocate interest first and reject overpayment',()=>{
-  assert.deepEqual(allocatePayment(25000,500000,10000),{interest:10000,principal:15000});
+  assert.deepEqual(allocatePayment(25000,500000,10000),{fee:0,interest:10000,principal:15000});
+  assert.deepEqual(allocatePayment(25000,500000,10000,4000),{fee:4000,interest:10000,principal:11000});
+  assert.throws(()=>allocatePayment(514001,500000,10000,4000),/Overpayment/);
   assert.throws(()=>allocatePayment(510001,500000,10000),/Overpayment/);
 });
 test('journals must balance',()=>{
