@@ -105,16 +105,17 @@ export async function capitalReport(actor:Actor){
       SUM(CASE WHEN l.account='late_fee_income' THEN l.credit-l.debit ELSE 0 END)::bigint AS fee_income,
       SUM(CASE WHEN l.account='recovery_income' THEN l.credit-l.debit ELSE 0 END)::bigint AS recovery_income,
       SUM(CASE WHEN l.account='provision_expense' THEN l.debit-l.credit ELSE 0 END)::bigint AS provisions,
-      SUM(CASE WHEN l.account='bad_debt_expense' THEN l.debit-l.credit ELSE 0 END)::bigint AS write_offs
+      SUM(CASE WHEN l.account='bad_debt_expense' THEN l.debit-l.credit ELSE 0 END)::bigint AS write_offs,
+      SUM(CASE WHEN l.account='operating_expense' THEN l.debit-l.credit ELSE 0 END)::bigint AS opex
     FROM journals j JOIN journal_lines l ON l.journal_id=j.id GROUP BY 1 ORDER BY 1 DESC LIMIT 12`)).rows
     .map(row=>{const income=Number(row.interest_income)+Number(row.fee_income)+Number(row.recovery_income),losses=Number(row.provisions)+Number(row.write_offs);
-      return {month:row.month as string,disbursed:Number(row.disbursed),collected:Number(row.collected),income,losses,net:income-losses};});
+      return {month:row.month as string,disbursed:Number(row.disbursed),collected:Number(row.collected),income,losses,opex:Number(row.opex),net:income-losses-Number(row.opex)};});
   const deployed=ledger.principal;
   const capital=ledger.ownerCapital+ledger.investorCapital;
-  const income=ledger.interestIncome+ledger.feeIncome+ledger.recoveryIncome,losses=ledger.provisionExpense+ledger.badDebt;
+  const income=ledger.interestIncome+ledger.feeIncome+ledger.recoveryIncome,losses=ledger.provisionExpense+ledger.badDebt,opex=ledger.operatingExpense;
   const last=monthly[0];
   // Annualised from the latest month: net result over principal currently deployed.
   const annualYield=last&&deployed?Math.round(last.net*12/deployed*1000)/10:0;
-  return {ledger,capital,deployed,idleCash:ledger.cash,inTransit:ledger.cashInTransit,income,losses,net:income-losses,
+  return {ledger,capital,deployed,idleCash:ledger.cash,inTransit:ledger.cashInTransit,income,losses,opex,net:income-losses-opex,
     utilisation:capital?Math.round(deployed/capital*1000)/10:0,annualYield,sources,movements,monthly};
 }

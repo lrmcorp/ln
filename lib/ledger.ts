@@ -8,7 +8,7 @@ export const A={
   principal:'principal_receivable',interest:'interest_receivable',unearned:'unearned_interest',fee:'fee_receivable',
   interestIncome:'interest_income',feeIncome:'late_fee_income',recoveryIncome:'recovery_income',
   allowance:'loan_loss_allowance',provisionExpense:'provision_expense',badDebtExpense:'bad_debt_expense',
-  ownerCapital:'owner_capital',investorCapital:'investor_capital',distributions:'capital_distributions'
+  ownerCapital:'owner_capital',investorCapital:'investor_capital',distributions:'capital_distributions',operatingExpense:'operating_expense'
 } as const;
 
 export type Line={account:string;debit:number;credit:number};

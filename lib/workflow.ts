@@ -6,10 +6,11 @@ import {requireRole} from './auth';
 import {calculateFlatSchedule, canonicalJson, jakartaToday} from './finance';
 import {normalizeWeeklyRates} from './terms';
 import {A,cr,dr,journal} from './ledger';
+import {assertExposure} from './exposure';
 import {releaseProvision} from './accounting';
 
 type Action =
- | {type:'policy';minPrincipal:number;maxPrincipal:number;flatInterestBps?:number;minWeeks?:number;maxWeeks?:number;minMonths?:number;maxMonths?:number;lateFeeMonthlyBps?:number;weeklyRates?:{weeks:number;rateBps:number}[];firstLoanMax?:number;repeatGrowthBps?:number;maxInstallmentIncomeBps?:number}
+ | {type:'policy';minPrincipal:number;maxPrincipal:number;flatInterestBps?:number;minWeeks?:number;maxWeeks?:number;minMonths?:number;maxMonths?:number;lateFeeMonthlyBps?:number;weeklyRates?:{weeks:number;rateBps:number}[];firstLoanMax?:number;repeatGrowthBps?:number;maxInstallmentIncomeBps?:number;maxOfficerExposure?:number;maxBranchExposure?:number}
  | {type:'customer';name:string;nik:string;phone:string;bankName:string;accountNumber:string}
  | {type:'create';customerId:string;principal:number;weeks:number}
  | {type:'approve';applicationId:string;reason?:string}
@@ -67,6 +68,9 @@ export async function perform(actor:Actor|null, action:Action){
       const firstLoanMax=action.firstLoanMax??Number(previous?.first_loan_max??1000000);
       const repeatGrowthBps=action.repeatGrowthBps??previous?.repeat_growth_bps??5000;
       const maxInstallmentIncomeBps=action.maxInstallmentIncomeBps??previous?.max_installment_income_bps??3500;
+      const maxOfficerExposure=action.maxOfficerExposure??Number(previous?.max_officer_exposure??0);
+      const maxBranchExposure=action.maxBranchExposure??Number(previous?.max_branch_exposure??0);
+      if(![maxOfficerExposure,maxBranchExposure].every(v=>Number.isSafeInteger(v)&&v>=0&&v<=1e13))throw new Error('Invalid policy limits');
       if(![firstLoanMax,repeatGrowthBps,maxInstallmentIncomeBps].every(Number.isSafeInteger)||firstLoanMax<action.minPrincipal||firstLoanMax>action.maxPrincipal||
         repeatGrowthBps<0||repeatGrowthBps>20000||maxInstallmentIncomeBps<100||maxInstallmentIncomeBps>10000) throw new Error('Invalid policy limits');
       if(![action.minPrincipal,action.maxPrincipal,flatInterestBps,minWeeks,maxWeeks,minMonths,maxMonths,lateFeeMonthlyBps].every(Number.isSafeInteger)||
@@ -75,10 +79,10 @@ export async function perform(actor:Actor|null, action:Action){
         minMonths<1||maxMonths<minMonths||maxMonths>60||lateFeeMonthlyBps<0||lateFeeMonthlyBps>10000) throw new Error('Invalid policy limits');
       const version=Number(previous?.version??0)+1;
       const result=await c.query(`INSERT INTO policy_versions(version,min_principal,max_principal,flat_interest_bps,min_weeks,max_weeks,min_months,max_months,late_fee_monthly_bps,weekly_rates,
-        first_loan_max,repeat_growth_bps,max_installment_income_bps,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
-        [version,action.minPrincipal,action.maxPrincipal,flatInterestBps,minWeeks,maxWeeks,minMonths,maxMonths,lateFeeMonthlyBps,JSON.stringify(weeklyRates),firstLoanMax,repeatGrowthBps,maxInstallmentIncomeBps,actor.id]);
+        first_loan_max,repeat_growth_bps,max_installment_income_bps,created_by,max_officer_exposure,max_branch_exposure) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+        [version,action.minPrincipal,action.maxPrincipal,flatInterestBps,minWeeks,maxWeeks,minMonths,maxMonths,lateFeeMonthlyBps,JSON.stringify(weeklyRates),firstLoanMax,repeatGrowthBps,maxInstallmentIncomeBps,actor.id,maxOfficerExposure,maxBranchExposure]);
       await c.query('INSERT INTO audit_events(actor_id,subject_type,subject_id,action,before_data,after_data) VALUES($1,$2,$3,$4,$5,$6)',
-        [actor.id,'policy',result.rows[0].id,'version_created',JSON.stringify(previous??null),JSON.stringify({...action,minMonths,maxMonths,lateFeeMonthlyBps,weeklyRates,firstLoanMax,repeatGrowthBps,maxInstallmentIncomeBps,version})]);
+        [actor.id,'policy',result.rows[0].id,'version_created',JSON.stringify(previous??null),JSON.stringify({...action,minMonths,maxMonths,lateFeeMonthlyBps,weeklyRates,firstLoanMax,repeatGrowthBps,maxInstallmentIncomeBps,maxOfficerExposure,maxBranchExposure,version})]);
       return {id:result.rows[0].id,version};
     }
     if(action.type==='customer'){
@@ -122,6 +126,9 @@ export async function perform(actor:Actor|null, action:Action){
         if(app.status==='signed_pending_approval'){
           const reviewed=(await c.query('SELECT verification_status FROM intake_evidence WHERE application_id=$1',[app.id])).rows[0];
           if(reviewed?.verification_status!=='manual_review_completed')throw new Error('Identity review required');
+          const current=(await c.query('SELECT * FROM policy_versions ORDER BY version DESC LIMIT 1')).rows[0];
+          await c.query('SELECT pg_advisory_xact_lock(710103)');
+          await assertExposure(c,current,{collectorId:app.collector_id??app.officer_id,branchId:app.branch_id,principal:Number(app.requested_principal),applicationId:app.id});
           const agreement=(await c.query('SELECT * FROM agreements WHERE application_id=$1 ORDER BY version DESC LIMIT 1 FOR UPDATE',[app.id])).rows[0];
           const signature=agreement?(await c.query('SELECT agreement_id FROM signature_evidence WHERE agreement_id=$1',[agreement.id])).rows[0]:null;
           if(!agreement?.signed_at||!signature||createHash('sha256').update(canonicalJson(agreement.snapshot)).digest('hex')!==agreement.snapshot_hash||

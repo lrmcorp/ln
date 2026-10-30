@@ -5,10 +5,11 @@ import type {capitalReport} from '@/lib/admin';
 type Report=Awaited<ReturnType<typeof capitalReport>>;
 const kinds:Record<string,string>={injection:'Setoran modal',withdrawal:'Penarikan modal',distribution:'Bagi hasil'};
 
-export default function CapitalPage({actor,report,today}:{actor:StaffActor;report:Report;today:string}){
+export default function CapitalPage({actor,report,today,branches}:{actor:StaffActor;report:Report;today:string;branches:{id:string;name:string}[]}){
   const action=useAction();
   return <Shell actor={actor} active="modal">
-    <PageHeader title="Modal dan investor" subtitle="Dari mana dana berasal, berapa yang sedang dipinjamkan, dan hasilnya. Dipakai untuk laporan bulanan ke investor."/>
+    <PageHeader title="Modal dan investor" subtitle="Dari mana dana berasal, berapa yang sedang dipinjamkan, dan hasilnya. Dipakai untuk laporan bulanan ke investor."
+      actions={<a className="button" href={`/modal/laporan?bulan=${today.slice(0,7)}`}>Laporan investor bulan ini</a>}/>
     <section className="metrics" aria-label="Posisi modal"><div><small>Modal tercatat</small><strong>{money(report.capital)}</strong><span>Pemilik dan investor</span></div>
       <div><small>Dipinjamkan</small><strong>{money(report.deployed)}</strong><span>{report.utilisation}% dari modal</span></div>
       <div><small>Kas menganggur</small><strong>{money(report.idleCash)}</strong><span>{report.inTransit?`+ ${money(report.inTransit)} tunai di petugas`:'Tidak ada tunai di petugas'}</span></div>
@@ -21,9 +22,16 @@ export default function CapitalPage({actor,report,today}:{actor:StaffActor;repor
         <label>Nama pemilik atau investor<input name="source" required maxLength={100}/></label><label>Jumlah (Rp)<input name="amount" type="number" min="1" required/></label>
         <label>Biaya modal per tahun (%)<input name="cost" type="number" min="0" max="100" step="0.1" defaultValue={0}/></label><label>Tanggal<input name="date" type="date" max={today} defaultValue={today} required/></label>
         <label>Catatan (opsional)<input name="note" maxLength={500}/></label><button disabled={action.pending}>Simpan</button></form></section>
+    <section className="newPanel"><div><h2>Catat biaya operasional</h2><p>Gaji, sewa, transportasi, dan biaya lain dibayar dari kas. Dipakai untuk menghitung laba per pinjaman. Biaya tanpa cabang dibagi ke semua pinjaman.</p></div>
+      <form method="post" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);action.run('/api/ops',{type:'record_expense',month:String(f.get('month')),category:String(f.get('category')),
+        branchId:String(f.get('branchId'))||null,amount:Number(f.get('amount')),note:String(f.get('note')??'')},{success:'Biaya tercatat.'});}}>
+        <label>Bulan<input name="month" type="month" max={today.slice(0,7)} defaultValue={today.slice(0,7)} required/></label>
+        <label>Jenis biaya<select name="category" defaultValue="Gaji"><option>Gaji</option><option>Sewa</option><option>Transportasi</option><option>Komunikasi</option><option>Lainnya</option></select></label>
+        <label>Cabang<select name="branchId" defaultValue=""><option value="">Seluruh perusahaan</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+        <label>Jumlah (Rp)<input name="amount" type="number" min="1" required/></label><label>Catatan (opsional)<input name="note" maxLength={500}/></label><button disabled={action.pending}>Simpan biaya</button></form></section>
     <Table title="Per sumber dana" head={['Sumber','Jenis','Modal bersih','Sudah dibagi','Biaya per tahun']} rows={report.sources.map(s=>[s.source,s.type==='owner'?'Pemilik':'Investor',money(s.net),money(s.distributed),`${s.costBps/100}%`])}/>
-    <Table title="Ringkasan bulanan" head={['Bulan','Dicairkan','Tertagih','Pendapatan','Cadangan dan hapus buku','Hasil bersih']}
-      rows={report.monthly.map(m=>[m.month,money(m.disbursed),money(m.collected),money(m.income),money(m.losses),money(m.net)])}/>
+    <Table title="Ringkasan bulanan" head={['Bulan','Dicairkan','Tertagih','Pendapatan','Cadangan dan hapus buku','Biaya operasional','Hasil bersih']}
+      rows={report.monthly.map(m=>[m.month,money(m.disbursed),money(m.collected),money(m.income),money(m.losses),money(m.opex),money(m.net)])}/>
     <section className="metrics compact" aria-label="Laba rugi kumulatif"><div><small>Pendapatan bunga</small><strong>{money(report.ledger.interestIncome)}</strong><span>Diakui saat angsuran jatuh tempo</span></div>
       <div><small>Pendapatan denda</small><strong>{money(report.ledger.feeIncome)}</strong><span>Denda keterlambatan</span></div>
       <div><small>Cadangan kerugian</small><strong>{money(report.ledger.allowance)}</strong><span>Saldo saat ini</span></div>

@@ -8,6 +8,7 @@ import {calculateFlatSchedule,jakartaToday} from './finance';
 import {monthlyTerms,weeklyRate,weeklyTerms} from './terms';
 import {applyRestructure,pendingRestructure,restructureTerms} from './accounting';
 import {borrowerGrade,gradeColumns} from './grade';
+import {assertExposure} from './exposure';
 
 export type IntakeInput=IdentityDetails&{name:string;phone:string;bankName:string;principal:number;weeks:number;weeklyIncome:number};
 
@@ -20,14 +21,16 @@ type Queryable={query:PoolClient['query']};
 export async function borrowingLimit(db:Queryable,customerId:string|null,policy:Record<string,any>){
   const max=Number(policy.max_principal),first=Math.min(max,Number(policy.first_loan_max));
   if(!customerId)return {limit:first,repeat:false,reason:'Pinjaman pertama'};
-  const history=(await db.query(`SELECT status,approved_principal,max_dpd FROM applications WHERE customer_id=$1 AND status IN ('paid_off','closed','written_off') ORDER BY approved_at DESC NULLS LAST`,[customerId])).rows;
-  if(history.some(row=>row.status==='written_off'))return {limit:0,repeat:true,reason:'Pernah dihapusbukukan'};
-  const last=history[0];
+  // The grade over every disbursed loan sets the limit: A grows, B keeps the last amount, C restarts at the first-loan cap, D cannot borrow.
+  const history=(await db.query(`SELECT ${gradeColumns} FROM customers c WHERE c.id=$1`,[customerId])).rows[0];
+  const {grade,label}=borrowerGrade({loans:history.grade_loans,worstDpd:history.grade_worst_dpd,writtenOff:history.grade_written_off});
+  const last=(await db.query(`SELECT approved_principal FROM applications WHERE customer_id=$1 AND status IN ('paid_off','closed') ORDER BY approved_at DESC NULLS LAST LIMIT 1`,[customerId])).rows[0];
+  if(grade==='D')return {limit:0,repeat:true,reason:`Kelas D: ${label.toLowerCase()}`};
   if(!last)return {limit:first,repeat:true,reason:'Belum ada pinjaman selesai'};
   const previous=Number(last.approved_principal);
-  if(last.max_dpd===0)return {limit:Math.min(max,Math.max(first,Math.round(previous*(10000+Number(policy.repeat_growth_bps))/10000))),repeat:true,reason:'Lunas tepat waktu'};
-  if(last.max_dpd<=7)return {limit:Math.min(max,Math.max(first,previous)),repeat:true,reason:`Pernah terlambat ${last.max_dpd} hari`};
-  return {limit:first,repeat:true,reason:`Pernah terlambat ${last.max_dpd} hari`};
+  if(grade==='A')return {limit:Math.min(max,Math.max(first,Math.round(previous*(10000+Number(policy.repeat_growth_bps))/10000))),repeat:true,reason:'Kelas A: lunas tepat waktu, batas naik'};
+  if(grade==='B')return {limit:Math.min(max,Math.max(first,previous)),repeat:true,reason:`Kelas B: ${label.toLowerCase()}, batas tetap`};
+  return {limit:first,repeat:true,reason:`Kelas C: ${label.toLowerCase()}, batas kembali ke pinjaman pertama`};
 }
 
 // Lets the officer see a returning borrower's limit before choosing the amount.
@@ -77,6 +80,8 @@ export async function createIntake(actor:Actor,input:IntakeInput,ktp:Uint8Array,
     // The largest weekly installment must fit within the policy share of weekly income.
     const largest=calculateFlatSchedule(input.principal,rateBps,input.weeks,new Date(0)).installments.reduce((max,item)=>Math.max(max,item.principal+item.interest),0);
     if(largest*10000>input.weeklyIncome*Number(policy.max_installment_income_bps))throw new Error('Installment exceeds income share');
+    await client.query('SELECT pg_advisory_xact_lock(710103)');
+    await assertExposure(client,policy,{collectorId:actor.id,branchId:actor.branch_id!,principal:input.principal});
     const customer=existing?(await client.query(`UPDATE customers SET phone=$1,bank_name=$2,account_last4=$3,weekly_income=$4 WHERE id=$5 RETURNING id`,
         [input.phone.trim(),input.bankName.trim(),input.bankAccountNumber.slice(-4),input.weeklyIncome,existing.id])).rows[0]
       :(await client.query(`INSERT INTO customers(name,nik_hash,nik_last4,phone,bank_name,account_last4,branch_id,weekly_income)

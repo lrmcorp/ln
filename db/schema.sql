@@ -218,3 +218,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS journals_event_source_idx ON journals(event_ty
 -- Several deposits per day are allowed so an officer can settle a shortfall later the same day.
 ALTER TABLE cash_deposits DROP CONSTRAINT IF EXISTS cash_deposits_officer_id_deposit_date_key;
 CREATE INDEX IF NOT EXISTS cash_deposits_officer_day_idx ON cash_deposits(officer_id,deposit_date);
+-- Concentration limits on principal outstanding; 0 means no limit.
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS max_officer_exposure bigint NOT NULL DEFAULT 0;
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS max_branch_exposure bigint NOT NULL DEFAULT 0;
+-- Operating costs (salaries, rent, transport) for profit per loan; branch_id null means company-wide.
+CREATE TABLE IF NOT EXISTS operating_expenses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), branch_id uuid REFERENCES branches(id), category text NOT NULL,
+  amount bigint NOT NULL CHECK (amount > 0), expense_month date NOT NULL, note text,
+  recorded_by uuid NOT NULL REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS operating_expenses_month_idx ON operating_expenses(expense_month);

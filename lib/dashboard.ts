@@ -69,6 +69,7 @@ export async function homeDashboard(actor:Actor,filter:ReportFilter={}){
     week:report.week,
     counts:{active:report.activeCount,late:late.length,inProcess:pipeline.length,finished:paidOffMonth,writtenOff:all.filter(loan=>loan.status==='written_off').length},
     upcoming:upcoming.slice(0,6),upcomingTotal:upcoming.reduce((s,row)=>s+row.amount,0),upcomingCount:upcoming.length,
+    targets:report.targets.filter(o=>o.target>0||o.received>0).slice(0,6),roll:(()=>{const last=report.roll.at(-1);return last&&last.currentBase+last.lateBase>0?last:null;})(),
     late:late.slice(0,5),aging,brokenPromises:brokenPromises.slice(0,5),brokenCount:brokenPromises.length,liquidity,readyToClose,
     pipeline:pipeline.map(row=>({id:row.id as string,customer:row.customer as string,principal:Number(row.principal),status:row.status as string,step:ownerSteps[row.status]??'Menunggu tanda tangan nasabah'})),
     verify:{payments:verify.payments,deposits:verify.deposits},

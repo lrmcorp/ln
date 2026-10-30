@@ -17,7 +17,7 @@ export const video=Buffer.from([26,69,223,163,...Array(20).fill(0)]);
 const signature=Buffer.from([137,80,78,71,13,10,26,10,...Array(300).fill(0)]);
 
 export async function ensureWeeklyPolicy(owner:Actor){
-  await perform(owner,{type:'policy',minPrincipal:100000,maxPrincipal:5000000,weeklyRates:[{weeks:4,rateBps:2000},{weeks:5,rateBps:2500},{weeks:6,rateBps:3000}],lateFeeMonthlyBps:500});
+  await perform(owner,{type:'policy',minPrincipal:100000,maxPrincipal:5000000,weeklyRates:[{weeks:4,rateBps:2000},{weeks:5,rateBps:2500},{weeks:6,rateBps:3000}],lateFeeMonthlyBps:500,maxOfficerExposure:0,maxBranchExposure:0});
 }
 
 // Runs a synthetic borrower from officer intake to an active, disbursed weekly loan.

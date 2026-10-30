@@ -16,7 +16,7 @@ function reminder(item:Item){
   return `Halo ${name}, angsuran pinjaman LN sebesar ${money(item.nextDue?.amount)} jatuh tempo ${shortDate(item.nextDue?.dueAt)}. Mohon disiapkan. Terima kasih.`;
 }
 
-export default function CollectionList({actor,items,week,officers,collectorId}:{actor:StaffActor;items:Item[];week:{start:string;end:string;due:number;collected:number;received:number}|null;officers:{id:string;name:string}[];collectorId:string}){
+export default function CollectionList({actor,items,week,officers,collectorId,target}:{actor:StaffActor;items:Item[];week:{start:string;end:string;due:number;collected:number;received:number}|null;officers:{id:string;name:string}[];collectorId:string;target?:{target:number;collected:number;rate:number;loans:number}|null}){
   const action=useAction();
   const counts={late:items.filter(i=>i.bucket==='late').length,today:items.filter(i=>i.bucket==='today').length,promise:items.filter(i=>i.bucket==='promise').length};
   const focus=counts.late+counts.today+counts.promise;
@@ -25,6 +25,10 @@ export default function CollectionList({actor,items,week,officers,collectorId}:{
       actions={actor.role==='officer'?<a className="button secondary" href="/setoran">Setor kas</a>:undefined}/>
     <section className="focusPanel" aria-label="Fokus saat ini"><div><small>Perlu didatangi hari ini</small><strong>{focus?`${focus} nasabah · ${counts.late} terlambat`:'Semua tagihan hari ini aman'}</strong></div>
       {week&&<div className="weekTarget"><small>Angsuran minggu ini tertagih</small><strong>{money(week.collected)} dari {money(week.due)}</strong></div>}</section>
+    {target&&<section className="card targetCard" aria-labelledby="target-title"><div className="cardHead"><h2 id="target-title">Target hari ini</h2><span className="muted">{target.loans} nasabah ditarget</span></div>
+      <div className="meterTop"><strong>{money(target.collected)}</strong><span className="muted">dari {money(target.target)} · {target.rate.toLocaleString('id-ID')}%</span></div>
+      <div className="meterBar" role="progressbar" aria-label="Kemajuan target hari ini" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100,target.rate)}><span style={{width:`${Math.min(100,target.rate)}%`}}/></div>
+      <small className="muted">Angsuran yang jatuh tempo sampai hari ini dan belum dibayar pagi ini. Bayaran di atas target tidak dihitung.</small></section>}
     {actor.role!=='officer'&&<form className="filterBar" method="get"><label>Penagih<select name="penagih" defaultValue={collectorId}><option value="">Semua penagih</option>{officers.map(o=><option key={o.id} value={o.id}>{displayName(o.name)}</option>)}</select></label><button className="secondary">Terapkan</button></form>}
     {sections.map(section=>{const list=items.filter(item=>item.bucket===section.bucket);
       return <section key={section.bucket} className="register" aria-labelledby={`tagihan-${section.bucket}`}><div className="sectionHead"><div><h2 id={`tagihan-${section.bucket}`}>{section.title}</h2><p>{list.length} nasabah</p></div></div>

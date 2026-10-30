@@ -45,8 +45,18 @@ export default function Dashboard({actor,data,branch}:{actor:StaffActor;data:Hom
           <Aging rows={data.aging}/>
           <dl className="rows">
             <div><dt>Tingkat tagih minggu ini</dt><dd>{data.collectionRate.toLocaleString('id-ID')}%</dd></div>
+            {data.roll&&<div><dt>Lancar → telat minggu ini</dt><dd className={data.roll.currentToLate>=5?'alertText':undefined}>{data.roll.currentToLate.toLocaleString('id-ID')}%</dd></div>}
+            {data.roll&&<div><dt>Telat yang pulih minggu ini</dt><dd>{data.roll.cure.toLocaleString('id-ID')}%</dd></div>}
             <div><dt>Janji bayar terlewat</dt><dd className={data.brokenCount?'alertText':undefined}>{data.brokenCount}</dd></div>
           </dl>
+        </section>
+        <section className="card" aria-labelledby="target-title">
+          <div className="cardHead"><h2 id="target-title">Target penagih hari ini</h2></div>
+          {data.targets.length===0?<p className="emptyLine">Tidak ada angsuran jatuh tempo hari ini.</p>:<ol className="leaderboard">{data.targets.map(o=><li key={o.id}>
+            <div className="lbTop"><span>{displayName(o.name)}</span><strong>{o.rate.toLocaleString('id-ID')}%</strong></div>
+            <div className="meterBar" role="progressbar" aria-label={`Pencapaian ${displayName(o.name)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100,o.rate)}><span style={{width:`${Math.min(100,o.rate)}%`}}/></div>
+            <small className="muted">{money(o.collected)} dari {money(o.target)}</small></li>)}</ol>}
+          <a className="cardLink" href={`/laporan${query}`}>Semua penagih</a>
         </section>
         <section className="card" aria-labelledby="count-title">
           <div className="cardHead"><h2 id="count-title">Angka pinjaman</h2></div>

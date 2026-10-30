@@ -9,7 +9,7 @@ type Application={id:string;status:string;requested_principal:string;approved_pr
   customer_name:string;customer_phone:string|null;officer_name:string;collector_id:string;collector_name:string|null;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;
   paid:string;recovered:string;remaining:string;fee:string;payoff_quote:string;pending_payments:number;restructure_pending:boolean;written_off_amount:string;
   transfer_reference:string|null;verification_status:string|null;signing_method:string|null;overdue_through_yesterday:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:Payment[];grade_loans:number;grade_worst_dpd:number;grade_written_off:boolean};
-export type Policy={version:number;min_principal:string;max_principal:string;late_fee_monthly_bps:number;weekly_rates:{weeks:number;rateBps:number}[];first_loan_max:string;repeat_growth_bps:number;max_installment_income_bps:number};
+export type Policy={version:number;min_principal:string;max_principal:string;late_fee_monthly_bps:number;weekly_rates:{weeks:number;rateBps:number}[];first_loan_max:string;repeat_growth_bps:number;max_installment_income_bps:number;max_officer_exposure?:string;max_branch_exposure?:string};
 type Data={today:string;applications:Application[];totals:{net_cash:string;principal_outstanding:string;interest_receivable:string}|null;policy:Policy|null;
   counts:{pending:number;active:number;unverified:number;deposits:number}|null;officers:{id:string;name:string;branch_id:string}[]};
 type Post=(path:string,body:unknown,hash?:string)=>void;
@@ -104,12 +104,15 @@ export function PolicyForm({policy,pending,post}:{policy:Policy|null;pending:boo
   const update=(index:number,key:'weeks'|'percent',value:string)=>setRates(current=>current.map((item,i)=>i===index?{...item,[key]:value}:item));
   return <form method="post" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);post('/api/actions',{type:'policy',minPrincipal:Number(f.get('minPrincipal')),maxPrincipal:Number(f.get('maxPrincipal')),
     lateFeeMonthlyBps:Math.round(Number(f.get('lateFeePercent'))*100),weeklyRates:rates.map(item=>({weeks:Number(item.weeks),rateBps:Math.round(Number(item.percent)*100)})),
-    firstLoanMax:Number(f.get('firstLoanMax')),repeatGrowthBps:Math.round(Number(f.get('repeatGrowth'))*100),maxInstallmentIncomeBps:Math.round(Number(f.get('incomeShare'))*100)},'kebijakan');}}>
+    firstLoanMax:Number(f.get('firstLoanMax')),repeatGrowthBps:Math.round(Number(f.get('repeatGrowth'))*100),maxInstallmentIncomeBps:Math.round(Number(f.get('incomeShare'))*100),
+    maxOfficerExposure:Number(f.get('maxOfficerExposure')||0),maxBranchExposure:Number(f.get('maxBranchExposure')||0)},'kebijakan');}}>
     <label>Jumlah minimum (Rp)<input name="minPrincipal" type="number" min="1" defaultValue={policy?.min_principal} required/></label>
     <label>Jumlah maksimum (Rp)<input name="maxPrincipal" type="number" min="1" defaultValue={policy?.max_principal} required/></label>
     <label>Batas pinjaman pertama (Rp)<input name="firstLoanMax" type="number" min="1" defaultValue={policy?.first_loan_max} required/></label>
     <label>Kenaikan batas setelah lunas tepat waktu (%)<input name="repeatGrowth" type="number" min="0" max="200" step="1" defaultValue={(policy?.repeat_growth_bps??5000)/100} required/></label>
     <label>Cicilan maksimal dari pendapatan mingguan (%)<input name="incomeShare" type="number" min="1" max="100" step="1" defaultValue={(policy?.max_installment_income_bps??3500)/100} required/></label>
+    <label>Batas pokok beredar per petugas (Rp, 0 = tanpa batas)<input name="maxOfficerExposure" type="number" min="0" step="1" defaultValue={policy?.max_officer_exposure??0} required/></label>
+    <label>Batas pokok beredar per cabang (Rp, 0 = tanpa batas)<input name="maxBranchExposure" type="number" min="0" step="1" defaultValue={policy?.max_branch_exposure??0} required/></label>
     <label>Denda terlambat per bulan (%)<input name="lateFeePercent" type="number" min="0" max="100" step="0.01" defaultValue={(policy?.late_fee_monthly_bps??0)/100} required/></label>
     <fieldset className="rateTable"><legend>Bunga per tenor mingguan</legend>{rates.map((item,index)=><div className="rateRow" key={index}>
       <label>Tenor (minggu)<input type="number" min="1" max="52" step="1" value={item.weeks} onChange={e=>update(index,'weeks',e.target.value)} required/></label>

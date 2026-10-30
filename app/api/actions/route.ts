@@ -33,10 +33,12 @@ const errors:Record<string,string>={
   'Identity review not allowed':'Bukti belum dapat ditinjau atau alasan kosong',
   'Identity evidence missing':'Bukti identitas tidak ditemukan',
   'Invalid weekly rates':'Tabel bunga mingguan tidak valid. Gunakan 1 sampai 52 minggu tanpa duplikat dan bunga 0 sampai 100%',
+  'Officer exposure limit reached':'Batas pokok beredar per petugas akan terlampaui. Naikkan batas di kebijakan atau alihkan ke petugas lain',
+  'Branch exposure limit reached':'Batas pokok beredar per cabang akan terlampaui',
   'Signed terms mismatch':'Syarat yang ditandatangani tidak cocok dengan pengajuan'
 };
 const schema=z.discriminatedUnion('type',[
-  z.object({type:z.literal('policy'),minPrincipal:z.number().int(),maxPrincipal:z.number().int(),flatInterestBps:z.number().int().optional(),minWeeks:z.number().int().optional(),maxWeeks:z.number().int().optional(),minMonths:z.number().int().optional(),maxMonths:z.number().int().optional(),lateFeeMonthlyBps:z.number().int().optional(),weeklyRates:z.array(z.object({weeks:z.number().int(),rateBps:z.number().int()})).min(1).max(20).optional(),firstLoanMax:z.number().int().optional(),repeatGrowthBps:z.number().int().optional(),maxInstallmentIncomeBps:z.number().int().optional()}),
+  z.object({type:z.literal('policy'),minPrincipal:z.number().int(),maxPrincipal:z.number().int(),flatInterestBps:z.number().int().optional(),minWeeks:z.number().int().optional(),maxWeeks:z.number().int().optional(),minMonths:z.number().int().optional(),maxMonths:z.number().int().optional(),lateFeeMonthlyBps:z.number().int().optional(),weeklyRates:z.array(z.object({weeks:z.number().int(),rateBps:z.number().int()})).min(1).max(20).optional(),firstLoanMax:z.number().int().optional(),repeatGrowthBps:z.number().int().optional(),maxInstallmentIncomeBps:z.number().int().optional(),maxOfficerExposure:z.number().int().optional(),maxBranchExposure:z.number().int().optional()}),
   z.object({type:z.literal('customer'),name:z.string().min(1).max(200),nik:z.string().regex(/^[0-9]{16}$/),phone:z.string().min(8).max(20),bankName:z.string().min(1).max(100),accountNumber:z.string().regex(/^[0-9]{5,30}$/)}),
   z.object({type:z.literal('create'),customerId:uuid,principal:z.number().int().positive(),weeks:z.number().int().positive()}),
   z.object({type:z.literal('approve'),applicationId:uuid,reason:z.string().max(500).optional()}),

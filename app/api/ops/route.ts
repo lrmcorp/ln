@@ -5,6 +5,7 @@ import {rejectPayment,reviewDeposit,verifyPayment} from '@/lib/payments';
 import {assignCollector,logVisit} from '@/lib/collections';
 import {proposeRestructure,writeOff} from '@/lib/accounting';
 import {closePaidOff} from '@/lib/workflow';
+import {recordExpense} from '@/lib/profit';
 import {createBranch,createUser,recordCapital,updateUser} from '@/lib/admin';
 
 const uuid=z.uuid();
@@ -17,6 +18,7 @@ const schema=z.discriminatedUnion('type',[
   z.object({type:z.literal('write_off'),applicationId:uuid,reason:z.string().max(500)}),
   z.object({type:z.literal('propose_restructure'),applicationId:uuid,weeks:z.number().int(),reason:z.string().max(500)}),
   z.object({type:z.literal('close_paid_off')}),
+  z.object({type:z.literal('record_expense'),month:z.string().max(7),category:z.string().max(60),branchId:uuid.nullable(),amount:z.number().int(),note:z.string().max(500)}),
   z.object({type:z.literal('create_branch'),name:z.string().max(100)}),
   z.object({type:z.literal('create_user'),username:z.string().max(40),name:z.string().max(200),role:z.string(),branchId:uuid,password:z.string().max(200)}),
   z.object({type:z.literal('update_user'),userId:uuid,password:z.string().max(200).optional(),active:z.boolean().optional(),branchId:uuid.optional()}),
@@ -33,7 +35,7 @@ const messages:Record<string,string>={
   'Write-off requires 30 days past due':'Hapus buku hanya untuk pinjaman terlambat minimal 30 hari','Invalid restructure':'Tenor restrukturisasi 1 sampai 52 minggu',
   'Nothing left to restructure':'Tidak ada sisa kewajiban untuk direstrukturisasi','Invalid branch':'Nama cabang tidak valid',
   'Invalid user':'Data pengguna tidak valid. Nama pengguna 3-40 huruf kecil/angka, kata sandi minimal 8 karakter','Cannot deactivate yourself':'Anda tidak dapat menonaktifkan akun sendiri',
-  'Invalid capital movement':'Data modal tidak valid','Not enough cash':'Kas tidak cukup untuk penarikan ini'
+  'Invalid capital movement':'Data modal tidak valid','Invalid expense':'Data biaya tidak valid','Not enough cash':'Kas tidak cukup untuk pengeluaran ini'
 };
 
 export async function POST(request:Request){
@@ -51,6 +53,7 @@ export async function POST(request:Request){
       case 'assign_collector':return NextResponse.json(await assignCollector(actor,op.applicationId,op.collectorId));
       case 'write_off':return NextResponse.json(await writeOff(actor,op.applicationId,op.reason));
       case 'propose_restructure':return NextResponse.json(await proposeRestructure(actor,op.applicationId,op.weeks,op.reason));
+      case 'record_expense':return NextResponse.json(await recordExpense(actor,op));
       case 'close_paid_off':return NextResponse.json(await closePaidOff(actor));
       case 'create_branch':return NextResponse.json(await createBranch(actor,op.name));
       case 'create_user':return NextResponse.json(await createUser(actor,op));

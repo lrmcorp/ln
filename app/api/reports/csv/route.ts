@@ -6,7 +6,7 @@ export async function GET(request:Request){
   if(!actor)return Response.json({error:'Silakan masuk terlebih dahulu'},{status:401});
   const url=new URL(request.url);
   const kind=url.searchParams.get('kind')??'pinjaman';
-  if(!['pinjaman','petugas','vintage','arus-kas'].includes(kind))return Response.json({error:'Jenis laporan tidak dikenal'},{status:404});
+  if(!['pinjaman','petugas','vintage','arus-kas','target','roll-rate','laba'].includes(kind))return Response.json({error:'Jenis laporan tidak dikenal'},{status:404});
   const uuid=(value:string|null)=>value&&/^[0-9a-f-]{36}$/i.test(value)?value:null;
   try{
     const csv=await reportCsv(actor,kind,{branchId:uuid(url.searchParams.get('cabang')),collectorId:uuid(url.searchParams.get('penagih'))});
