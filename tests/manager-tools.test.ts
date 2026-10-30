@@ -107,3 +107,20 @@ test('operating expenses are journaled against cash and fully allocated to loans
   const unbalanced=(await pool.query('SELECT journal_id FROM journal_lines GROUP BY journal_id HAVING SUM(debit)<>SUM(credit)')).rows;
   assert.equal(unbalanced.length,0);
 });
+
+test('a branch manager can originate a loan for an officer, who collects it and can take the signature',async()=>{
+  const {createIntake,signApplication,signingPreview}=await import('../lib/intake');
+  const {ktp,video,uniqueNik}=await import('./helpers');
+  const name='Nasabah Manajer Uji';
+  const base={nik:uniqueNik(),dateOfBirth:'1990-01-01',phone:'081234567890',address:'Alamat rekaan',motherName:'Ibu Rekaan',bankName:'Bank Demo',
+    bankAccountNumber:'1234567890',accountHolder:name,occupation:'',loanPurpose:'',principal:500000,weeks:5,weeklyIncome:2000000,name};
+  await assert.rejects(createIntake(actors.manager,{...base,collectorId:null},ktp,video),/Collector required/);
+  await assert.rejects(createIntake(actors.manager,{...base,collectorId:actors.manager.id},ktp,video),/Collector required/,'collector must be an officer');
+  const {id}=await createIntake(actors.manager,{...base,collectorId:actors.officer.id},ktp,video);
+  const row=(await pool.query('SELECT officer_id,collector_id FROM applications WHERE id=$1',[id])).rows[0];
+  assert.deepEqual(row,{officer_id:actors.manager.id,collector_id:actors.officer.id});
+  await assert.rejects(createIntake(actors.owner,{...base,nik:uniqueNik()},ktp,video),/Forbidden/);
+  const preview=await signingPreview(actors.officer,id);
+  await signApplication(actors.officer,id,name,true,preview.quote.hash,Buffer.from([137,80,78,71,13,10,26,10,...Array(300).fill(0)]));
+  assert.equal((await pool.query('SELECT status FROM applications WHERE id=$1',[id])).rows[0].status,'signed_pending_approval');
+});

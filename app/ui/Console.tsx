@@ -6,7 +6,7 @@ import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type S
 type Payment={id:string;amount:string;reference:string|null;createdAt:string;recordedBy:string;amountSource:'entered'|'read_confirmed'|'read_auto';status:'pending'|'verified'|'rejected';
   method:'transfer'|'cash';fee:string;recovery:string;earlyPayoff:boolean;reviewNote:string|null;hasReceipt:boolean};
 type Application={id:string;status:string;requested_principal:string;approved_principal:string|null;interest_amount:string|null;term_weeks:number|null;term_months:number|null;repayment_frequency:string;
-  customer_name:string;customer_phone:string|null;officer_name:string;collector_id:string;collector_name:string|null;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;
+  customer_name:string;customer_phone:string|null;officer_name:string;officer_id:string;collector_id:string;collector_name:string|null;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;
   paid:string;recovered:string;remaining:string;fee:string;payoff_quote:string;pending_payments:number;restructure_pending:boolean;written_off_amount:string;
   transfer_reference:string|null;verification_status:string|null;signing_method:string|null;overdue_through_yesterday:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:Payment[];grade_loans:number;grade_worst_dpd:number;grade_written_off:boolean};
 export type Policy={version:number;min_principal:string;max_principal:string;late_fee_monthly_bps:number;weekly_rates:{weeks:number;rateBps:number}[];first_loan_max:string;repeat_growth_bps:number;max_installment_income_bps:number;max_officer_exposure?:string;max_branch_exposure?:string};
@@ -37,7 +37,7 @@ const done=(status:string)=>['paid_off','closed','written_off'].includes(status)
 
 function needsAction(app:Application,role:StaffRole,today:string){
   if(role==='owner')return !!ownerSteps[app.status]||app.pending_payments>0||dpdOf(app,today)>=WRITE_OFF_MIN_DPD;
-  if(role==='manager')return app.pending_payments>0||dpdOf(app,today)>0;
+  if(role==='manager')return app.pending_payments>0||dpdOf(app,today)>0||app.status==='awaiting_signature';
   return app.status==='awaiting_signature'||app.restructure_pending||dpdOf(app,today)>0;
 }
 
@@ -79,7 +79,7 @@ export default function Console({actor,initial}:{actor:StaffActor|null;initial:D
   return <Shell actor={actor} active="pinjaman">
     <PageHeader title={actor.role==='officer'?'Pinjaman Anda':'Daftar pinjaman'} subtitle={focus}
       actions={actor.role==='officer'?<><a className="button secondary" href="/tagihan">Tagihan hari ini</a><a className="button" href="/pengajuan/baru">Pengajuan baru</a></>:
-        <><a className="button secondary" href="/tagihan">Lihat tagihan</a>{(counts?.unverified||counts?.deposits)?<a className="button" href="/verifikasi">Verifikasi sekarang</a>:null}</>}/>
+        <><a className="button secondary" href="/tagihan">Lihat tagihan</a>{actor.role==='manager'?<a className="button" href="/pengajuan/baru">Pengajuan baru</a>:(counts?.unverified||counts?.deposits)?<a className="button" href="/verifikasi">Verifikasi sekarang</a>:null}</>}/>
     <section id="register" className="register"><div className="sectionHead"><div><h2>Daftar pinjaman</h2><p>{filtered.length} dari {apps.length} pinjaman</p></div>
       <label className="searchBox">Cari nasabah<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nama nasabah"/></label></div>
       <div className="tabs" role="tablist" aria-label="Saring pinjaman">{tabs.map(item=><button key={item.key} role="tab" aria-selected={tab===item.key} className={tab===item.key?'tab active':'tab'} onClick={()=>setTab(item.key)}>{item.label}</button>)}</div>
@@ -229,7 +229,7 @@ function Case({app,role,actorId,today,officers,pending,post,chain,cash}:{app:App
         {path:'/api/actions',body:{type:'approve',applicationId:app.id}},{path:'/api/actions',body:{type:'authorize',applicationId:app.id}}],`case-${app.id}`)}>Bukti sesuai, setujui</button>}</div>}
       {app.snapshot&&<details><summary>Ketentuan yang ditandatangani</summary><div className="schedule"><p>Bunga tetap {Number(app.snapshot.rateBps)/100}% untuk seluruh tenor. Kebijakan versi {app.snapshot.policyVersion}. {app.signing_method&&`Ditandatangani di ${app.signing_method==='officer_device_demo'?'perangkat petugas':'sesi nasabah'}.`}</p>{Array.isArray(app.snapshot.terms)&&app.snapshot.terms.map((term:string,index:number)=><p key={index}>{term}</p>)}</div></details>}
       <div className="actions">
-        {role==='officer'&&app.status==='awaiting_signature'&&<a className="caseActionLink" href={`/tanda-tangan/${app.id}`}>Buka syarat dan tanda tangan</a>}
+        {(role==='officer'||(role==='manager'&&app.officer_id===actorId))&&app.status==='awaiting_signature'&&<a className="caseActionLink" href={`/tanda-tangan/${app.id}`}>Buka syarat dan tanda tangan</a>}
         {role==='officer'&&app.restructure_pending&&<a className="caseActionLink" href={`/tanda-tangan/${app.id}`}>Buka restrukturisasi untuk ditandatangani nasabah</a>}
         {role!=='officer'&&active&&officers.length>0&&<form method="post" className="inlineForm" onSubmit={e=>{e.preventDefault();post('/api/ops',{type:'assign_collector',applicationId:app.id,collectorId:new FormData(e.currentTarget).get('collectorId')});}}>
           <label>Penagih<select name="collectorId" defaultValue={app.collector_id}>{officers.map(o=><option key={o.id} value={o.id}>{displayName(o.name)}</option>)}</select></label><button className="secondary" disabled={pending}>Simpan penagih</button></form>}

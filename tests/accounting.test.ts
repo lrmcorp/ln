@@ -59,7 +59,6 @@ test('officer cash payments wait for verification, rejection reverses the ledger
   const good=await recordPayment(actors.officer,id,125000,pngReceipt(),{method:'cash'});
   await verifyPayment(actors.manager,good.paymentId,'Cocok');
   const day=todayIso();
-  const cashBefore=await accountBalance(null,'cash');
   // Other tests may record cash today for the same officer, so compare against the reported expectation.
   const deposit=await submitDeposit(actors.officer,day,120000,pngReceipt());
   assert.equal(deposit.difference,120000-deposit.expected);
@@ -68,7 +67,10 @@ test('officer cash payments wait for verification, rejection reverses the ledger
   assert.equal(topUp.expected,deposit.expected-120000);
   assert.equal(topUp.difference,0);
   await reviewDeposit(actors.manager,deposit.id,true);
-  assert.equal(await accountBalance(null,'cash')-cashBefore,120000);
+  // Other suites move company cash in parallel, so check this deposit's own journal.
+  const moved=(await pool.query(`SELECT SUM(l.debit-l.credit)::bigint AS cash FROM journal_lines l JOIN journals j ON j.id=l.journal_id
+    WHERE j.event_type='cash_deposit' AND j.source_id=$1 AND l.account='cash'`,[deposit.id])).rows[0];
+  assert.equal(Number(moved.cash),120000);
   await assert.rejects(reviewDeposit(actors.manager,deposit.id,true),/already reviewed/);
 });
 

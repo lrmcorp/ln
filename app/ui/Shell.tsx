@@ -21,7 +21,7 @@ const nav:Record<StaffRole,NavGroup[]>={
     {title:'Pengaturan',items:[{key:'kebijakan',href:'/kebijakan',label:'Kebijakan pinjaman',icon:'policy'},{key:'admin',href:'/admin',label:'Cabang & pengguna',icon:'users'}]}],
   manager:[{title:'Operasional',items:[{key:'beranda',href:'/',label:'Beranda',icon:'home'},{key:'tagihan',href:'/tagihan',label:'Tagihan',icon:'collect',badge:'late'},
       {key:'verifikasi',href:'/verifikasi',label:'Verifikasi',icon:'verify',badge:'verify'},{key:'lokasi',href:'/lokasi',label:'Lokasi nasabah',icon:'location'}]},
-    {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'}]},
+    {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'},{key:'pengajuan',href:'/pengajuan/baru',label:'Pengajuan baru',icon:'intake'}]},
     {title:'Keuangan',items:[{key:'laporan',href:'/laporan',label:'Laporan',icon:'report'}]}],
   officer:[{title:'Hari ini',items:[{key:'tagihan',href:'/tagihan',label:'Tagihan',icon:'collect',badge:'late'},{key:'setoran',href:'/setoran',label:'Setoran kas',icon:'deposit'}]},
     {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'},{key:'pengajuan',href:'/pengajuan/baru',label:'Pengajuan baru',icon:'intake'}]}]

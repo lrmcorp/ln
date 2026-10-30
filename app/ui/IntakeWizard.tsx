@@ -1,6 +1,7 @@
 'use client';
 import {useState} from 'react';
 import {calculateFlatSchedule} from '@/lib/finance';
+import {displayName} from './Shell';
 
 type Policy={version:number;min_principal:string;max_principal:string;late_fee_monthly_bps:number;weekly_rates:{weeks:number;rateBps:number}[]};
 const money=(amount:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(amount);
@@ -8,7 +9,9 @@ type Fields={name:string;nik:string;dateOfBirth:string;phone:string;address:stri
 const empty:Fields={name:'',nik:'',dateOfBirth:'',phone:'',address:'',motherName:'',bankName:'',bankAccountNumber:'',accountHolder:'',occupation:'',loanPurpose:'',weeklyIncome:''};
 type Limit={limit:number;repeat:boolean;reason:string;grade:string;gradeLabel:string;maxInstallmentShareBps:number};
 
-export default function IntakeWizard({policy}:{policy:Policy}){
+export default function IntakeWizard({policy,officers=[]}:{policy:Policy;officers?:{id:string;name:string}[]}){
+  const manager=officers.length>0;
+  const [collectorId,setCollectorId]=useState(officers.length===1?officers[0].id:'');
   const [step,setStep]=useState(1);
   const [fields,setFields]=useState(empty);
   const [ktp,setKtp]=useState<File|null>(null);
@@ -45,7 +48,7 @@ export default function IntakeWizard({policy}:{policy:Policy}){
     try{
       const body=new FormData();
       for(const [key,value] of Object.entries(fields))body.set(key,value);
-      body.set('principal',principal);body.set('weeks',weeks);body.set('ktp',ktp);body.set('liveness',liveness);
+      if(manager)body.set('collectorId',collectorId);body.set('principal',principal);body.set('weeks',weeks);body.set('ktp',ktp);body.set('liveness',liveness);
       const response=await fetch('/api/intake',{method:'POST',body});
       const result=await response.json();if(!response.ok)throw new Error(result.error??'Pengajuan gagal');
       window.location.assign(`/tanda-tangan/${result.id}`);
@@ -55,9 +58,10 @@ export default function IntakeWizard({policy}:{policy:Policy}){
       if(/NIK|Nama tidak sama|pinjaman berjalan/.test(message)){setStep(1);requestAnimationFrame(()=>document.querySelector<HTMLInputElement>('input[name=nik]')?.focus());}
     }
   }
-  return <main className="intakePage"><div className="intakeShell"><a href="/pinjaman" className="signingBack">Kembali ke daftar pinjaman</a><div className="intakeHeading"><small>Petugas lapangan · Langkah {step} dari 3</small><h1>Pengajuan baru</h1><p>{step===1?'Catat identitas dan bukti nasabah.':'Perlihatkan rincian pinjaman sebelum nasabah menandatangani.'}</p></div>
+  return <main className="intakePage"><div className="intakeShell"><a href="/pinjaman" className="signingBack">Kembali ke daftar pinjaman</a><div className="intakeHeading"><small>{manager?'Manajer cabang':'Petugas lapangan'} · Langkah {step} dari 3</small><h1>Pengajuan baru</h1><p>{step===1?'Catat identitas dan bukti nasabah.':'Perlihatkan rincian pinjaman sebelum nasabah menandatangani.'}</p></div>
     <div className="intakeProgress" aria-label={`Langkah ${step} dari 3`}><span className="current">1. Data & bukti</span><span className={step===2?'current':''}>2. Jumlah & jadwal</span><span>3. Tanda tangan</span></div>
     {step===1?<form method="post" className="intakeForm" onSubmit={event=>{event.preventDefault();if(!ktp||!liveness){setError('Foto KTP dan video tantangan wajib diisi');return;}void checkBorrower();}}>
+      {manager&&<><h2>Petugas penagih</h2><div className="intakeGrid"><label>Siapa yang menagih pinjaman ini?<select required value={collectorId} onChange={e=>setCollectorId(e.target.value)}><option value="">Pilih petugas</option>{officers.map(o=><option key={o.id} value={o.id}>{displayName(o.name)}</option>)}</select></label></div></>}
       <h2>Identitas nasabah</h2><div className="intakeGrid"><label>Nama sesuai KTP<input required maxLength={200} {...field('name')}/></label><label>NIK 16 digit<input name="nik" required inputMode="numeric" pattern="[0-9]{16}" {...field('nik')}/></label><label>Tanggal lahir<input required type="date" {...field('dateOfBirth')}/></label><label>Nama ibu kandung<input required maxLength={200} {...field('motherName')}/></label><label>Nomor telepon<input required type="tel" {...field('phone')}/></label><label>Alamat tempat tinggal<textarea required maxLength={500} {...field('address')}/></label></div>
       <h2>Rekening pencairan</h2><div className="intakeGrid"><label>Nama bank<input required {...field('bankName')}/></label><label>Nomor rekening<input required inputMode="numeric" pattern="[0-9]{5,30}" {...field('bankAccountNumber')}/></label><label>Nama pemilik rekening<input required {...field('accountHolder')}/></label></div>
       <h2>Bukti identitas</h2><p className="intakeNote">Gunakan hanya data rekaan dalam demo. Berkas disimpan terenkripsi. Video tantangan belum diverifikasi otomatis dan harus ditinjau manual.</p><div className="intakeGrid"><label>Foto depan KTP (JPG/PNG, maksimal 4 MB)<input required={!ktp} type="file" accept="image/jpeg,image/png" capture="environment" onChange={event=>setKtp(event.target.files?.[0]??null)}/>{ktp&&<small>Tersimpan untuk pengajuan ini: {ktp.name}</small>}</label><label>Video wajah menoleh kiri dan kanan (MP4/WebM, maksimal 12 MB)<input required={!liveness} type="file" accept="video/mp4,video/webm" capture="user" onChange={event=>setLiveness(event.target.files?.[0]??null)}/>{liveness&&<small>Tersimpan untuk pengajuan ini: {liveness.name}</small>}</label></div><div className="intakeGrid"><label>Pendapatan bersih per minggu (Rp)<input required type="number" min="1" step="1" inputMode="numeric" {...field('weeklyIncome')}/></label><label>Pekerjaan atau sumber penghasilan (opsional)<input maxLength={200} {...field('occupation')}/></label><label>Tujuan pinjaman (opsional)<input maxLength={300} {...field('loanPurpose')}/></label></div>

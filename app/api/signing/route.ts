@@ -11,7 +11,7 @@ export async function POST(request:Request){
   if(origin&&new URL(origin).host!==request.headers.get('host'))return NextResponse.json({error:'Permintaan dari asal berbeda ditolak'},{status:403});
   const actor=await currentActor();
   if(!actor)return NextResponse.json({error:'Silakan masuk terlebih dahulu'},{status:401});
-  if(actor.role!=='officer'&&actor.role!=='customer')return NextResponse.json({error:'Peran Anda tidak dapat menandatangani'},{status:403});
+  if(actor.role==='owner')return NextResponse.json({error:'Peran Anda tidak dapat menandatangani'},{status:403});
   try{
     const body=schema.parse(await request.json());
     const signature=Buffer.from(body.signatureDataUrl.slice('data:image/png;base64,'.length),'base64');

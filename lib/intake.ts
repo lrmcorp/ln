@@ -10,7 +10,7 @@ import {applyRestructure,pendingRestructure,restructureTerms} from './accounting
 import {borrowerGrade,gradeColumns} from './grade';
 import {assertExposure} from './exposure';
 
-export type IntakeInput=IdentityDetails&{name:string;phone:string;bankName:string;principal:number;weeks:number;weeklyIncome:number};
+export type IntakeInput=IdentityDetails&{name:string;phone:string;bankName:string;principal:number;weeks:number;weeklyIncome:number;collectorId?:string|null};
 
 const nikHashOf=(nik:string)=>createHash('sha256').update(`${process.env.SESSION_SECRET}:${nik}`).digest('hex');
 const sameName=(a:string,b:string)=>a.trim().toLocaleLowerCase('id-ID')===b.trim().toLocaleLowerCase('id-ID');
@@ -35,7 +35,7 @@ export async function borrowingLimit(db:Queryable,customerId:string|null,policy:
 
 // Lets the officer see a returning borrower's limit before choosing the amount.
 export async function borrowerLookup(actor:Actor,nik:string,name:string){
-  if(actor.role!=='officer')throw new Error('Forbidden');
+  if(actor.role!=='officer'&&actor.role!=='manager')throw new Error('Forbidden');
   if(!/^[0-9]{16}$/.test(nik))throw new Error('Invalid borrower details');
   const policy=(await pool.query('SELECT * FROM policy_versions ORDER BY version DESC LIMIT 1')).rows[0];
   if(!policy)throw new Error('No active policy');
@@ -61,7 +61,8 @@ function validBirthDate(value:string){
 }
 
 export async function createIntake(actor:Actor,input:IntakeInput,ktp:Uint8Array,liveness:Uint8Array){
-  if(actor.role!=='officer')throw new Error('Forbidden');
+  // Officers collect what they originate; a branch manager originates for an officer of the branch, who then collects it.
+  if(actor.role!=='officer'&&actor.role!=='manager')throw new Error('Forbidden');
   if(!input.name.trim()||input.name.length>200||!/^[0-9]{16}$/.test(input.nik)||!validBirthDate(input.dateOfBirth)||
     !/^[0-9+ -]{8,20}$/.test(input.phone)||!input.address.trim()||input.address.length>500||
     !input.motherName.trim()||input.motherName.length>200||!input.bankName.trim()||input.bankName.length>100||
@@ -81,15 +82,17 @@ export async function createIntake(actor:Actor,input:IntakeInput,ktp:Uint8Array,
     const largest=calculateFlatSchedule(input.principal,rateBps,input.weeks,new Date(0)).installments.reduce((max,item)=>Math.max(max,item.principal+item.interest),0);
     if(largest*10000>input.weeklyIncome*Number(policy.max_installment_income_bps))throw new Error('Installment exceeds income share');
     await client.query('SELECT pg_advisory_xact_lock(710103)');
-    await assertExposure(client,policy,{collectorId:actor.id,branchId:actor.branch_id!,principal:input.principal});
+    const collectorId=actor.role==='officer'?actor.id:input.collectorId??'';
+    if(actor.role==='manager'&&!(await client.query(`SELECT 1 FROM users WHERE id::text=$1 AND role='officer' AND active AND branch_id=$2`,[collectorId,actor.branch_id])).rows[0])throw new Error('Collector required');
+    await assertExposure(client,policy,{collectorId,branchId:actor.branch_id!,principal:input.principal});
     const customer=existing?(await client.query(`UPDATE customers SET phone=$1,bank_name=$2,account_last4=$3,weekly_income=$4 WHERE id=$5 RETURNING id`,
         [input.phone.trim(),input.bankName.trim(),input.bankAccountNumber.slice(-4),input.weeklyIncome,existing.id])).rows[0]
       :(await client.query(`INSERT INTO customers(name,nik_hash,nik_last4,phone,bank_name,account_last4,branch_id,weekly_income)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
       [input.name.trim(),nikHash,input.nik.slice(-4),input.phone.trim(),input.bankName.trim(),input.bankAccountNumber.slice(-4),actor.branch_id,input.weeklyIncome])).rows[0];
     const application=(await client.query(`INSERT INTO applications(customer_id,officer_id,collector_id,branch_id,policy_id,requested_principal,term_weeks,repayment_frequency,status,weekly_income)
-      VALUES($1,$2,$2,$3,$4,$5,$6,'weekly_from_approval','awaiting_signature',$7) RETURNING id`,
-      [customer.id,actor.id,actor.branch_id,policy.id,input.principal,input.weeks,input.weeklyIncome])).rows[0];
+      VALUES($1,$2,$8,$3,$4,$5,$6,'weekly_from_approval','awaiting_signature',$7) RETURNING id`,
+      [customer.id,actor.id,actor.branch_id,policy.id,input.principal,input.weeks,input.weeklyIncome,collectorId])).rows[0];
     const details:IdentityDetails={nik:input.nik,dateOfBirth:input.dateOfBirth,address:input.address.trim(),motherName:input.motherName.trim(),
       bankAccountNumber:input.bankAccountNumber,accountHolder:input.accountHolder.trim(),occupation:input.occupation.trim(),loanPurpose:input.loanPurpose.trim()};
     await storeIntakeEvidence(client,application.id,details,ktp,liveness);
@@ -100,7 +103,7 @@ export async function createIntake(actor:Actor,input:IntakeInput,ktp:Uint8Array,
 }
 
 async function signingRow(actor:Actor,applicationId:string){
-  if(actor.role!=='officer'&&actor.role!=='customer')throw new Error('Forbidden');
+  if(!['officer','manager','customer'].includes(actor.role))throw new Error('Forbidden');
   const result=await pool.query(`SELECT a.*,c.name AS customer_name,c.account_last4,p.version AS policy_version,p.flat_interest_bps,p.late_fee_monthly_bps,p.weekly_rates
     FROM applications a JOIN customers c ON c.id=a.customer_id JOIN policy_versions p ON p.id=a.policy_id WHERE a.id=$1`,[applicationId]);
   const row=result.rows[0];
@@ -113,10 +116,10 @@ async function signingRow(actor:Actor,applicationId:string){
   return row;
 }
 
-// The originating officer, the assigned collector (for restructures), or the borrower may present terms.
+// The originating officer or manager, the assigned collector, or the borrower may present terms.
 function mayHandOver(actor:Actor,row:Record<string,any>){
   if(actor.role==='customer')return row.customer_id===actor.customer_id;
-  return row.branch_id===actor.branch_id&&(row.officer_id===actor.id||(row.status==='active'&&row.collector_id===actor.id));
+  return row.branch_id===actor.branch_id&&(row.officer_id===actor.id||row.collector_id===actor.id);
 }
 
 // Older monthly applications keep their original terms; new intake is weekly from the approval date.
@@ -141,7 +144,7 @@ export async function signApplication(actor:Actor,applicationId:string,signerNam
   if(!accepted)throw new Error('Terms acceptance required');
   if(signature.length<250||signature.length>500000||imageMime(signature)!=='image/png')throw new Error('Invalid signature image');
   return transaction(async client=>{
-    if(actor.role!=='officer'&&actor.role!=='customer')throw new Error('Forbidden');
+    if(!['officer','manager','customer'].includes(actor.role))throw new Error('Forbidden');
     const result=await client.query(`SELECT a.*,c.name AS customer_name,c.account_last4,p.version AS policy_version,p.flat_interest_bps,p.late_fee_monthly_bps,p.weekly_rates
       FROM applications a JOIN customers c ON c.id=a.customer_id JOIN policy_versions p ON p.id=a.policy_id WHERE a.id=$1 FOR UPDATE OF a`,[applicationId]);
     const row=result.rows[0];
@@ -168,7 +171,7 @@ export async function signApplication(actor:Actor,applicationId:string,signerNam
       [applicationId,item.sequence,item.dueAt,item.principal,item.interest]);
     await client.query('UPDATE applications SET status=$1 WHERE id=$2',['signed_pending_approval',applicationId]);
     await client.query('INSERT INTO audit_events(actor_id,subject_type,subject_id,action,after_data) VALUES($1,$2,$3,$4,$5)',
-      [actor.id,'application',applicationId,'signed_pending_approval',JSON.stringify({agreementHash:quote.hash,method:actor.role==='officer'?'officer_device_demo':'customer_session_demo'})]);
+      [actor.id,'application',applicationId,'signed_pending_approval',JSON.stringify({agreementHash:quote.hash,method:actor.role!=='customer'?'officer_device_demo':'customer_session_demo'})]);
     return {id:applicationId,hash:quote.hash};
   });
 }
@@ -178,5 +181,5 @@ async function storeSignature(client:PoolClient,agreementId:string,signature:Uin
   await client.query(`INSERT INTO signature_evidence(agreement_id,signature_cipher,signature_iv,signature_tag,signature_sha256,signer_name,signing_method,witness_officer_id,terms_hash)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [agreementId,protectedSignature.cipher,protectedSignature.iv,protectedSignature.tag,protectedSignature.sha256,
-      signerName,actor.role==='officer'?'officer_device_demo':'customer_session_demo',actor.role==='officer'?actor.id:null,hash]);
+      signerName,actor.role!=='customer'?'officer_device_demo':'customer_session_demo',actor.role!=='customer'?actor.id:null,hash]);
 }
