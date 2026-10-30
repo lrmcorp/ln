@@ -40,6 +40,9 @@ services:
       no_proxy: app,postgres,localhost,127.0.0.1
     depends_on:
       - app
+    networks:
+      - default
+      - edge
     ports:
       - "80:80"
       - "443:443"
@@ -47,6 +50,12 @@ services:
       - ${CADDYFILE:-./Caddyfile.preview}:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+
+networks:
+  # Shared with the CowAgent stack (lrmcorp/lrmagents); only Caddy joins it.
+  edge:
+    name: lnint-edge
+    external: true
 
 volumes:
   postgres_data:

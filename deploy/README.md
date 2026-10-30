@@ -31,3 +31,7 @@ Pada setiap deploy, GitHub Actions memeriksa apakah `int.lnint.xyz` hanya tereso
 Aplikasi pada subdomain masih **demo**, belum siap untuk pinjaman atau data nasabah nyata. HTTPS yang valid memungkinkan pengujian login per peran dan izin lokasi pada perangkat, tetapi tidak menghilangkan batasan produk dan keamanan yang dijelaskan di README utama.
 
 Jika workflow gagal, lihat langkah yang gagal di GitHub Actions. Bila `sudo -n docker` gagal, periksa hak sudo pengguna `ubuntu` di konsol Tencent. Bila SSH gagal, periksa kunci yang di-bind, secret GitHub, dan aturan firewall. Jangan menonaktifkan pemeriksaan host key untuk memperbaiki koneksi.
+
+## CowAgent di VPS yang sama
+
+Konsol web CowAgent di-deploy dari repo `lrmcorp/lrmagents` ke `~/cowagent`. Caddy di stack ini meneruskan `https://agent.lnint.xyz` ke kontainer `cowagent:9899` melalui jaringan Docker bersama `lnint-edge`. Tambahkan record `A` dengan host `agent` ke `43.152.240.47` di DNSPod. Langkah secret dan variabel GitHub ada di README repo tersebut. Sebelum CowAgent berjalan, subdomain itu mengembalikan 502; `int.lnint.xyz` tidak terpengaruh.
