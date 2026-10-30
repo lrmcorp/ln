@@ -31,20 +31,6 @@ const titles:Record<string,string>={beranda:'Beranda',tagihan:'Tagihan',verifika
 const shortLabels:Record<string,string>={setoran:'Setoran',pinjaman:'Pinjaman',pengajuan:'Pengajuan'};
 type NavData={badges:{late:number;verify:number};branches:{id:string;name:string}[]};
 
-function useTheme(){
-  const [dark,setDark]=useState(false);
-  useEffect(()=>{
-    const explicit=document.documentElement.dataset.theme;
-    setDark(explicit?explicit==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches);
-  },[]);
-  function toggle(){
-    const next=!dark;setDark(next);
-    document.documentElement.dataset.theme=next?'dark':'light';
-    try{localStorage.setItem('ln-theme',next?'dark':'light');}catch{}
-  }
-  return {dark,toggle};
-}
-
 function Clock(){
   const [now,setNow]=useState('');
   useEffect(()=>{
@@ -69,7 +55,6 @@ export function Shell({actor,active,children}:{actor:StaffActor;active:string;ch
   const groups=nav[actor.role];
   const [drawer,setDrawer]=useState(false);
   const [data,setData]=useState<NavData|null>(null);
-  const theme=useTheme();
   useEffect(()=>{fetch('/api/nav',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(setData).catch(()=>setData(null));},[]);
   async function signOut(){await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});window.location.assign('/');}
   const group=groups.find(g=>g.items.some(item=>item.key===active))?.title??'Operasional';
@@ -83,8 +68,7 @@ export function Shell({actor,active,children}:{actor:StaffActor;active:string;ch
     <div className="main">
       <header className="topbar"><button className="iconButton menuButton" onClick={()=>setDrawer(true)} aria-label="Buka menu"><Icon name="menu"/></button>
         <nav className="crumbs" aria-label="Lokasi halaman"><span>{group}</span><span aria-hidden="true">/</span><strong>{titles[active]??active}</strong></nav>
-        <div className="topTools">{actor.role==='owner'&&data&&<BranchPicker branches={data.branches}/>}<Clock/>
-          <button className="iconButton" onClick={theme.toggle} aria-label={theme.dark?'Pakai tema terang':'Pakai tema gelap'} title={theme.dark?'Tema terang':'Tema gelap'}><Icon name={theme.dark?'sun':'moon'}/></button></div></header>
+        <div className="topTools">{actor.role==='owner'&&data&&<BranchPicker branches={data.branches}/>}<Clock/></div></header>
       <main className="page">{children}</main>
     </div>
     {actor.role==='officer'&&<nav className="bottomNav" aria-label="Menu petugas">{groups.flatMap(g=>g.items).map(item=><a key={item.key} href={item.href} aria-current={item.key===active?'page':undefined}><Icon name={item.icon}/><span>{shortLabels[item.key]??item.label}</span></a>)}</nav>}

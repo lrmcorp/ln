@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {PageHeader,Shell,StatusChip,displayName,money,shortDate,type StaffActor} from './Shell';
+import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
 import type {HomeDashboard} from '@/lib/dashboard';
 
 const compact=(value:number)=>value>=1e9?`${(value/1e9).toLocaleString('id-ID',{maximumFractionDigits:1})} M`:value>=1e6?`${(value/1e6).toLocaleString('id-ID',{maximumFractionDigits:1})} jt`:value>=1e3?`${Math.round(value/1e3)} rb`:String(value);
@@ -18,10 +18,13 @@ export default function Dashboard({actor,data,branch}:{actor:StaffActor;data:Hom
   const query=branch?`?cabang=${branch}`:'';
   const primary=verifyCount>0?{href:'/verifikasi',label:`Verifikasi ${verifyCount} bukti`}:{href:'/tagihan',label:'Lihat tagihan'};
   const change=data.cash.change;
+  const action=useAction();
+  const todoCount=data.pipeline.length+(verifyCount?1:0)+(data.readyToClose?1:0)+(data.brokenCount?1:0);
   return <Shell actor={actor} active="beranda">
     <PageHeader title={`Halo, ${first}`} subtitle={<>{date} · Data diperbarui otomatis, terakhir {time(data.generatedAt)}{branch?' · satu cabang':''}</>}
       actions={<><a className="button secondary" href={`/api/reports/csv?kind=pinjaman${branch?`&cabang=${branch}`:''}`}>Unduh laporan</a><a className="button" href={primary.href}>{primary.label}</a></>}/>
     <div className="dashGrid">
+      <div className="sideStack">
       <section className="card cashCard" aria-labelledby="cash-title">
         <div className="cardHead"><h2 id="cash-title">Uang masuk</h2><span className="muted">Pembayaran nasabah, termasuk yang menunggu verifikasi</span></div>
         <div className="kpiRow">
@@ -33,15 +36,16 @@ export default function Dashboard({actor,data,branch}:{actor:StaffActor;data:Hom
         </div>
         <CashChart data={data}/>
       </section>
+      {data.liquidity&&<Liquidity data={data.liquidity}/>}
+      </div>
       <div className="sideStack">
         <section className="card" aria-labelledby="risk-title">
           <div className="cardHead"><h2 id="risk-title">Risiko portofolio</h2></div>
           <RiskMeter percent={data.par7.percent}/>
+          <Aging rows={data.aging}/>
           <dl className="rows">
-            <div><dt>Terlambat 1+ hari</dt><dd>{data.par1.percent.toLocaleString('id-ID')}% · {data.par1.count}</dd></div>
-            <div><dt>Terlambat 7+ hari</dt><dd>{data.par7.percent.toLocaleString('id-ID')}% · {data.par7.count}</dd></div>
-            <div><dt>Terlambat 30+ hari</dt><dd>{data.par30.percent.toLocaleString('id-ID')}% · {data.par30.count}</dd></div>
             <div><dt>Tingkat tagih minggu ini</dt><dd>{data.collectionRate.toLocaleString('id-ID')}%</dd></div>
+            <div><dt>Janji bayar terlewat</dt><dd className={data.brokenCount?'alertText':undefined}>{data.brokenCount}</dd></div>
           </dl>
         </section>
         <section className="card" aria-labelledby="count-title">
@@ -59,9 +63,12 @@ export default function Dashboard({actor,data,branch}:{actor:StaffActor;data:Hom
     </div>
     <div className="cardGrid">
       <section className="card" aria-labelledby="todo-title">
-        <div className="cardHead"><h2 id="todo-title">Perlu tindakan</h2><span className="countPill">{data.pipeline.length+(verifyCount?1:0)}</span></div>
-        {data.pipeline.length===0&&verifyCount===0?<p className="emptyLine">Tidak ada yang menunggu Anda.</p>:<ul className="list">
+        <div className="cardHead"><h2 id="todo-title">Perlu tindakan</h2><span className="countPill">{todoCount}</span></div>
+        {todoCount===0?<p className="emptyLine">Tidak ada yang menunggu Anda.</p>:<ul className="list">
           {verifyCount>0&&<li><a href="/verifikasi"><span><strong>Verifikasi bukti</strong><small>{data.verify.payments} pembayaran · {data.verify.deposits} setoran kas</small></span><span className="go">Buka</span></a></li>}
+          {data.brokenCount>0&&<li><a href="/tagihan"><span><strong>{data.brokenCount} janji bayar terlewat</strong><small>Tanggal janji lewat, belum bayar. Hubungi hari ini.</small></span><span className="go">Buka</span></a></li>}
+          {data.readyToClose>0&&<li className="rowAction"><span><strong>{data.readyToClose} pinjaman lunas</strong><small>Semua kewajiban terbayar dan terverifikasi</small></span>
+            <button className="secondary" disabled={action.pending} onClick={()=>action.run('/api/ops',{type:'close_paid_off'},{success:'Pinjaman lunas ditutup.'})}>Tutup semua</button></li>}
           {data.pipeline.slice(0,5).map(item=><li key={item.id}><a href={`/pinjaman#case-${item.id}`}><span><strong>{displayName(item.customer)}</strong><small>{item.step} · {money(item.principal)}</small></span><span className="go">Buka</span></a></li>)}
         </ul>}
         {data.pipeline.length>5&&<a className="cardLink" href="/pinjaman">Semua {data.pipeline.length} pengajuan</a>}
@@ -81,6 +88,7 @@ export default function Dashboard({actor,data,branch}:{actor:StaffActor;data:Hom
         {data.counts.late>0&&<a className="cardLink" href="/tagihan">Buka tagihan</a>}
       </section>
     </div>
+    {action.feedback}
   </Shell>;
 }
 
@@ -133,5 +141,27 @@ function CashChart({data}:{data:HomeDashboard}){
           <span><i className="swatch s1"/>{tip.now!==undefined?money(tip.now):'Belum berjalan'}</span><span><i className="swatch s2 dashed"/>{tip.last!==undefined?money(tip.last):'-'}</span></div>}
       </div>
     </div>}
+  </div>;
+}
+
+function Liquidity({data}:{data:NonNullable<HomeDashboard['liquidity']>}){
+  const short=data.afterReady<0;
+  return <section className="card" aria-labelledby="liq-title">
+    <div className="cardHead"><h2 id="liq-title">Kas dan pencairan</h2><a className="cardLink flat" href="/modal">Modal dan investor</a></div>
+    <div className="kpiRow liquidity">
+      <div className="kpi lead"><small>Kas tercatat</small><strong>{money(data.cash)}</strong><span className="muted">Tunai di petugas {money(data.transit)}</span></div>
+      <div className="kpi"><small>Siap dicairkan</small><strong>{money(data.ready)}</strong><span className="muted">Masih proses {money(data.early)}</span></div>
+      <div className="kpi"><small>Sisa setelah pencairan</small><strong className={short?'alertText':undefined}>{short?`Kurang ${money(-data.afterReady)}`:money(data.afterReady)}</strong></div>
+      <div className="kpi"><small>Masuk 7 hari ke depan</small><strong>{money(data.inflow7)}</strong><span className="muted">28 hari: {money(data.inflow28)}</span></div>
+    </div>
+  </section>;
+}
+
+// Principal outstanding split by days past due; each segment is labelled in the rows below, so color is not the only cue.
+function Aging({rows}:{rows:HomeDashboard['aging']}){
+  const total=rows.reduce((s,row)=>s+row.amount,0);
+  return <div className="aging">
+    <div className="agingBar" role="img" aria-label={rows.map(row=>`${row.label} ${money(row.amount)}`).join(', ')}>{rows.map(row=>row.amount>0&&<span key={row.key} className={`seg ${row.key}`} style={{width:`${row.amount/total*100}%`}}/>)}</div>
+    <dl className="rows">{rows.map(row=><div key={row.key}><dt><i className={`key ${row.key}`}/>{row.label} · {row.count}</dt><dd>{money(row.amount)}</dd></div>)}</dl>
   </div>;
 }

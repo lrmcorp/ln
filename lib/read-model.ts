@@ -1,6 +1,7 @@
 import {pool} from './db';
 import type {Actor} from './auth';
 import {runPortfolioAccruals} from './accounting';
+import {gradeColumns} from './grade';
 
 const balance=(accounts:string)=>`COALESCE((SELECT SUM(l.debit-l.credit) FROM journal_lines l JOIN journals j ON j.id=l.journal_id WHERE j.application_id=a.id AND l.account IN (${accounts})),0)::bigint`;
 
@@ -21,7 +22,7 @@ export async function dashboard(actor:Actor){
       ${balance("'fee_receivable'")} AS fee,
       ${balance("'principal_receivable','interest_receivable','fee_receivable','unearned_interest'")} AS payoff_quote,
       EXISTS(SELECT 1 FROM agreements r WHERE r.application_id=a.id AND r.kind='restructure' AND r.signed_at IS NULL) AS restructure_pending,
-      d.bank_reference AS transfer_reference,
+      d.bank_reference AS transfer_reference,${gradeColumns},
       COALESCE((SELECT SUM(i.principal+i.interest)::bigint FROM installments i WHERE i.application_id=a.id AND i.due_at<(now() AT TIME ZONE 'Asia/Jakarta')::date),0) AS overdue_through_yesterday,
       COALESCE((SELECT json_agg(json_build_object('sequence',i.sequence,'dueAt',i.due_at,'amount',i.principal+i.interest) ORDER BY i.sequence) FROM installments i WHERE i.application_id=a.id),'[]') AS installments,
       COALESCE((SELECT json_agg(json_build_object('id',p.id,'amount',p.amount,'reference',p.bank_reference,'createdAt',p.created_at,'recordedBy',vu.name,'amountSource',p.amount_source,

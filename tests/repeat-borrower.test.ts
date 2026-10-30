@@ -15,7 +15,7 @@ const base=(name:string,nik:string)=>({name,nik,dateOfBirth:'1990-01-01',phone:'
 
 test('first loans are capped and the weekly installment must fit the income share',async()=>{
   const nik=uniqueNik(),name=`Nasabah Baru ${randomUUID().slice(0,6)}`;
-  assert.deepEqual(await borrowerLookup(actors.officer,nik,name),{limit:1000000,repeat:false,reason:'Pinjaman pertama',maxInstallmentShareBps:3500});
+  assert.deepEqual(await borrowerLookup(actors.officer,nik,name),{limit:1000000,repeat:false,reason:'Pinjaman pertama',grade:'Baru',gradeLabel:'Belum ada riwayat',maxInstallmentShareBps:3500});
   await assert.rejects(createIntake(actors.officer,{...base(name,nik),principal:1500000,weeks:5,weeklyIncome:5000000},ktp,video),/Above borrowing limit/);
   // Rp125.000 per week is more than 35% of Rp300.000.
   await assert.rejects(createIntake(actors.officer,{...base(name,nik),principal:500000,weeks:5,weeklyIncome:300000},ktp,video),/Installment exceeds income share/);
@@ -27,7 +27,7 @@ test('a borrower who paid on time returns with a higher limit; open loans and na
   await assert.rejects(borrowerLookup(actors.officer,nik,name),/open loan/);
   await recordPayment(actors.manager,id,960000,pngReceipt());
   await perform(actors.owner,{type:'close',applicationId:id});
-  assert.deepEqual(await borrowerLookup(actors.officer,nik,name),{limit:1200000,repeat:true,reason:'Lunas tepat waktu',maxInstallmentShareBps:3500});
+  assert.deepEqual(await borrowerLookup(actors.officer,nik,name),{limit:1200000,repeat:true,reason:'Lunas tepat waktu',grade:'A',gradeLabel:'Selalu tepat waktu',maxInstallmentShareBps:3500});
   await assert.rejects(borrowerLookup(actors.officer,nik,'Nama Lain'),/Name does not match/);
   const other={...actors.officer,branch_id:randomUUID()};
   await assert.rejects(borrowerLookup(other,nik,name),/another branch/);

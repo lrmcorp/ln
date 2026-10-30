@@ -1,6 +1,6 @@
 import {createHash, randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
-import {transaction} from './db';
+import {pool,transaction} from './db';
 import type {Actor} from './auth';
 import {requireRole} from './auth';
 import {calculateFlatSchedule, canonicalJson, jakartaToday} from './finance';
@@ -209,4 +209,15 @@ export async function perform(actor:Actor|null, action:Action){
       }
     }
   });
+}
+
+// Closes every paid-off loan with no payment awaiting verification, one transaction each; returns how many closed.
+export async function closePaidOff(actor:Actor|null){
+  if(!actor)throw new Error('Forbidden');
+  requireRole(actor,['owner']);
+  const ids=(await pool.query(`SELECT a.id FROM applications a WHERE a.status='paid_off'
+    AND NOT EXISTS(SELECT 1 FROM payments p WHERE p.application_id=a.id AND p.status='pending') ORDER BY a.submitted_at`)).rows.map((row:{id:string})=>row.id);
+  let closed=0;
+  for(const id of ids){await perform(actor,{type:'close',applicationId:id});closed++;}
+  return {closed};
 }

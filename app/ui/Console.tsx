@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {borrowerGrade} from '@/lib/grade';
 import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor,type StaffRole} from './Shell';
 
 type Payment={id:string;amount:string;reference:string|null;createdAt:string;recordedBy:string;amountSource:'entered'|'read_confirmed'|'read_auto';status:'pending'|'verified'|'rejected';
@@ -7,7 +8,7 @@ type Payment={id:string;amount:string;reference:string|null;createdAt:string;rec
 type Application={id:string;status:string;requested_principal:string;approved_principal:string|null;interest_amount:string|null;term_weeks:number|null;term_months:number|null;repayment_frequency:string;
   customer_name:string;customer_phone:string|null;officer_name:string;collector_id:string;collector_name:string|null;submitted_at:string;snapshot:any;snapshot_hash:string|null;signed_at:string|null;
   paid:string;recovered:string;remaining:string;fee:string;payoff_quote:string;pending_payments:number;restructure_pending:boolean;written_off_amount:string;
-  transfer_reference:string|null;verification_status:string|null;signing_method:string|null;overdue_through_yesterday:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:Payment[]};
+  transfer_reference:string|null;verification_status:string|null;signing_method:string|null;overdue_through_yesterday:string;installments:{sequence:number;dueAt:string;amount:string}[];payments:Payment[];grade_loans:number;grade_worst_dpd:number;grade_written_off:boolean};
 export type Policy={version:number;min_principal:string;max_principal:string;late_fee_monthly_bps:number;weekly_rates:{weeks:number;rateBps:number}[];first_loan_max:string;repeat_growth_bps:number;max_installment_income_bps:number};
 type Data={today:string;applications:Application[];totals:{net_cash:string;principal_outstanding:string;interest_receivable:string}|null;policy:Policy|null;
   counts:{pending:number;active:number;unverified:number;deposits:number}|null;officers:{id:string;name:string;branch_id:string}[]};
@@ -83,7 +84,7 @@ export default function Console({actor,initial}:{actor:StaffActor|null;initial:D
       <label className="searchBox">Cari nasabah<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nama nasabah"/></label></div>
       <div className="tabs" role="tablist" aria-label="Saring pinjaman">{tabs.map(item=><button key={item.key} role="tab" aria-selected={tab===item.key} className={tab===item.key?'tab active':'tab'} onClick={()=>setTab(item.key)}>{item.label}</button>)}</div>
       {filtered.length===0?<div className="empty">{apps.length===0?(actor.role==='officer'?'Belum ada pinjaman. Mulai dari menu Pengajuan.':'Pinjaman akan muncul di sini setelah diajukan.'):query?'Tidak ada nasabah dengan nama itu.':'Tidak ada pinjaman di tab ini.'}</div>:
-        <div className="caseList">{filtered.map(app=><Case key={app.id} app={app} role={actor.role} actorId={actor.id} today={today} officers={initial?.officers??[]} pending={action.pending} post={post} chain={chain}/>)}</div>}
+        <div className="caseList">{filtered.map(app=><Case key={app.id} app={app} role={actor.role} actorId={actor.id} today={today} officers={initial?.officers??[]} pending={action.pending} post={post} chain={chain} cash={initial?.totals?Number(initial.totals.net_cash):null}/>)}</div>}
     </section>
     {action.feedback}
   </Shell>;
@@ -185,7 +186,7 @@ function PaymentForm({app,pending,post,role}:{app:Application;pending:boolean;po
     <button disabled={pending||reading}>{reading?'Membaca bukti…':earlyPayoff?'Simpan pelunasan':'Simpan pembayaran'}</button></form>;
 }
 
-function Case({app,role,actorId,today,officers,pending,post,chain}:{app:Application;role:StaffRole;actorId:string;today:string;officers:Data['officers'];pending:boolean;post:Post;chain:Chain}){
+function Case({app,role,actorId,today,officers,pending,post,chain,cash}:{app:Application;role:StaffRole;actorId:string;today:string;officers:Data['officers'];pending:boolean;post:Post;chain:Chain;cash:number|null}){
   const [open,setOpen]=useState(false);
   const [enrollment,setEnrollment]=useState<{code:string;expiresAt:string}|null>(null);
   const [enrollmentError,setEnrollmentError]=useState('');
@@ -213,7 +214,7 @@ function Case({app,role,actorId,today,officers,pending,post,chain}:{app:Applicat
   const isCollector=app.collector_id===actorId;
   const toggleLabel=open?'Tutup':role==='owner'&&ownerSteps[app.status]?'Tinjau':active&&role!=='owner'?'Catat bayar':'Detail';
   const sub=app.restructure_pending?'Menunggu tanda tangan restrukturisasi':active&&next?`Berikutnya ${shortDate(next.dueAt)} · ${money(next.open)}`:role==='owner'&&ownerSteps[app.status]?ownerSteps[app.status]:labels[app.status]??app.status;
-  return <article className="case" id={`case-${app.id}`}><div className="caseTop"><div>{chip}{app.pending_payments>0&&<StatusChip tone="pending">{app.pending_payments} menunggu verifikasi</StatusChip>}
+  return <article className="case" id={`case-${app.id}`}><div className="caseTop"><div>{chip}{app.pending_payments>0&&<StatusChip tone="pending">{app.pending_payments} menunggu verifikasi</StatusChip>}<GradeChip app={app}/>
       <h3>{displayName(app.customer_name)}</h3><p>{role!=='officer'||!isCollector?`Penagih ${displayName(app.collector_name??app.officer_name)}`:`Diajukan ${shortDate(app.submitted_at)}`}</p><p className="nextStep">{sub}</p></div>
     <div className="caseAmount"><small>{headline.label}</small><strong>{headline.value}</strong><button className="textButton" aria-expanded={open} aria-label={`${toggleLabel}: ${displayName(app.customer_name)}`} onClick={()=>setOpen(!open)}>{toggleLabel}</button></div></div>
     {['active','paid_off','written_off'].includes(app.status)&&<Repayment app={app} today={today}/>}
@@ -244,9 +245,15 @@ function Case({app,role,actorId,today,officers,pending,post,chain}:{app:Applicat
             ...(app.status==='signed'?[{path:'/api/actions',body:{type:'authorize',applicationId:app.id}}]:[]),
             ...(app.status!=='transfer_initiated'?[{path:'/api/actions',body:{type:'initiate',applicationId:app.id,idempotencyKey:`demo-${app.id}`}}]:[]),
             {path:'/api/actions',body:{type:'confirm',applicationId:app.id,bankReference:f.get('bankReference'),proof:f.get('proof')}}],`case-${app.id}`);}}>
-          <p>Transfer {money(app.approved_principal)} ke rekening nasabah, lalu isi referensinya. Pinjaman aktif dan jadwal mingguan berjalan. Simulasi bank untuk demo.</p>
+          {cash!==null&&cash<Number(app.approved_principal)&&<p className="error" role="alert">Kas tercatat {money(cash)}, kurang dari jumlah pencairan. Pastikan dana tersedia sebelum transfer.</p>}<p>Transfer {money(app.approved_principal)} ke rekening nasabah, lalu isi referensinya. Pinjaman aktif dan jadwal mingguan berjalan. Simulasi bank untuk demo.</p>
           <label>Referensi bank (angka)<input name="bankReference" inputMode="numeric" pattern="[0-9]+" required/></label><label>Catatan bukti transfer<input name="proof" required defaultValue="Transfer dari rekening operasional"/></label><button disabled={pending}>Cairkan dana</button></form>}
         {role==='owner'&&app.status==='paid_off'&&(app.pending_payments>0?<p>Tutup pinjaman setelah {app.pending_payments} pembayaran diverifikasi. <a href="/verifikasi">Buka verifikasi</a></p>:<button disabled={pending} onClick={()=>post('/api/actions',{type:'close',applicationId:app.id})}>Tutup pinjaman lunas</button>)}
         {app.status==='closed'&&<p className="completion">Semua kewajiban tercatat telah dibayar dan pinjaman ditutup.</p>}</div></div>}
   </article>;
+}
+
+const gradeTone={A:'ok',B:'neutral',C:'due',D:'late',Baru:'neutral'} as const;
+function GradeChip({app}:{app:Application}){
+  const g=borrowerGrade({loans:app.grade_loans,worstDpd:app.grade_worst_dpd,writtenOff:app.grade_written_off});
+  return <span title={g.label}><StatusChip tone={gradeTone[g.grade]}>{g.grade==='Baru'?'Nasabah baru':`Kelas ${g.grade}`}<span className="srOnly"> · {g.label}</span></StatusChip></span>;
 }

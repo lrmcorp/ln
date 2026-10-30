@@ -4,6 +4,7 @@ import {currentActor} from '@/lib/auth';
 import {rejectPayment,reviewDeposit,verifyPayment} from '@/lib/payments';
 import {assignCollector,logVisit} from '@/lib/collections';
 import {proposeRestructure,writeOff} from '@/lib/accounting';
+import {closePaidOff} from '@/lib/workflow';
 import {createBranch,createUser,recordCapital,updateUser} from '@/lib/admin';
 
 const uuid=z.uuid();
@@ -15,6 +16,7 @@ const schema=z.discriminatedUnion('type',[
   z.object({type:z.literal('assign_collector'),applicationId:uuid,collectorId:uuid}),
   z.object({type:z.literal('write_off'),applicationId:uuid,reason:z.string().max(500)}),
   z.object({type:z.literal('propose_restructure'),applicationId:uuid,weeks:z.number().int(),reason:z.string().max(500)}),
+  z.object({type:z.literal('close_paid_off')}),
   z.object({type:z.literal('create_branch'),name:z.string().max(100)}),
   z.object({type:z.literal('create_user'),username:z.string().max(40),name:z.string().max(200),role:z.string(),branchId:uuid,password:z.string().max(200)}),
   z.object({type:z.literal('update_user'),userId:uuid,password:z.string().max(200).optional(),active:z.boolean().optional(),branchId:uuid.optional()}),
@@ -49,6 +51,7 @@ export async function POST(request:Request){
       case 'assign_collector':return NextResponse.json(await assignCollector(actor,op.applicationId,op.collectorId));
       case 'write_off':return NextResponse.json(await writeOff(actor,op.applicationId,op.reason));
       case 'propose_restructure':return NextResponse.json(await proposeRestructure(actor,op.applicationId,op.weeks,op.reason));
+      case 'close_paid_off':return NextResponse.json(await closePaidOff(actor));
       case 'create_branch':return NextResponse.json(await createBranch(actor,op.name));
       case 'create_user':return NextResponse.json(await createUser(actor,op));
       case 'update_user':return NextResponse.json(await updateUser(actor,op.userId,op));

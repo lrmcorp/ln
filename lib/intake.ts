@@ -7,6 +7,7 @@ import {imageMime,protect} from './protected-data';
 import {calculateFlatSchedule,jakartaToday} from './finance';
 import {monthlyTerms,weeklyRate,weeklyTerms} from './terms';
 import {applyRestructure,pendingRestructure,restructureTerms} from './accounting';
+import {borrowerGrade,gradeColumns} from './grade';
 
 export type IntakeInput=IdentityDetails&{name:string;phone:string;bankName:string;principal:number;weeks:number;weeklyIncome:number};
 
@@ -38,7 +39,9 @@ export async function borrowerLookup(actor:Actor,nik:string,name:string){
   const customer=(await pool.query('SELECT id,name,branch_id FROM customers WHERE nik_hash=$1',[nikHashOf(nik)])).rows[0];
   if(customer)await assertRepeatAllowed(pool,customer,actor,name);
   const result=await borrowingLimit(pool,customer?.id??null,policy);
-  return {...result,maxInstallmentShareBps:Number(policy.max_installment_income_bps)};
+  const history=customer?(await pool.query(`SELECT ${gradeColumns} FROM customers c WHERE c.id=$1`,[customer.id])).rows[0]:null;
+  const grade=borrowerGrade({loans:history?.grade_loans??0,worstDpd:history?.grade_worst_dpd??0,writtenOff:!!history?.grade_written_off});
+  return {...result,grade:grade.grade,gradeLabel:grade.label,maxInstallmentShareBps:Number(policy.max_installment_income_bps)};
 }
 
 async function assertRepeatAllowed(db:Queryable,customer:Record<string,any>,actor:Actor,name:string){

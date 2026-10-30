@@ -112,10 +112,6 @@ button.pillAction{border:1px solid var(--line)}button.pillAction.primary{border-
 /* 2026-10-30 reference layout: grouped sidebar, sticky top bar, white cards on a light gray page. Plus Jakarta Sans throughout; one green accent. */
 :root{--paper:#f3f5f4;--surface:#fff;--ink:#16201b;--muted:#5b6660;--line:#e2e7e4;--accent:#0b6b47;--accent-ink:#fff;--alert:#b42318;--soft:#e7f2ec;--shadow:#16201b1f;
   --warn:#8a5a00;--warn-soft:#fbf0d9;--alert-soft:#fdecea;--series-1:#0b6b47;--series-2:#2a78d6;--font-body:var(--font-sans),system-ui,sans-serif;--font-label:var(--font-sans),system-ui,sans-serif;color-scheme:light}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--paper:#0f1311;--surface:#171b19;--ink:#e7ece9;--muted:#9ba69f;--line:#2a312d;--accent:#2b9e6c;--accent-ink:#06140d;--alert:#f07a70;--soft:#1b2b22;--shadow:#0009;
-  --warn:#e8b553;--warn-soft:#33280f;--alert-soft:#3a1d1b;--series-1:#2b9e6c;--series-2:#4a8ce4;color-scheme:dark}}
-:root[data-theme=dark]{--paper:#0f1311;--surface:#171b19;--ink:#e7ece9;--muted:#9ba69f;--line:#2a312d;--accent:#2b9e6c;--accent-ink:#06140d;--alert:#f07a70;--soft:#1b2b22;--shadow:#0009;
-  --warn:#e8b553;--warn-soft:#33280f;--alert-soft:#3a1d1b;--series-1:#2b9e6c;--series-2:#4a8ce4;color-scheme:dark}
 body{font-size:15px;line-height:1.45}
 h1,h2,h3{font-family:var(--font-sans),system-ui,sans-serif;font-weight:700;letter-spacing:-.015em}
 h1{font-size:clamp(1.45rem,2.2vw,1.75rem);line-height:1.2}h2{font-size:1.15rem}h3{font-size:1.05rem}
@@ -232,3 +228,10 @@ button:not(.textButton){border-radius:9px;font-size:.9rem}button:disabled{opacit
 .dashGrid{align-items:start}.kpiRow{grid-template-columns:minmax(210px,1.5fr) repeat(3,minmax(0,1fr))}.kpi strong{white-space:nowrap;overflow-wrap:normal}.kpi.lead strong{font-size:clamp(1.35rem,2vw,1.65rem)}
 @media(max-width:1180px){.kpiRow{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:960px){.app{background:none}}
+/* aging bar and row actions; segments run green to deep red with the label beside each */
+.aging{margin-top:14px}.agingBar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--paper);gap:2px}
+.seg.current,.key.current{background:var(--accent)}.seg.d7,.key.d7{background:#d99a1e}.seg.d30,.key.d30{background:#d4532f}.seg.d31,.key.d31{background:#8f1d14}
+.key{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;vertical-align:baseline}
+.list li.rowAction{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:54px;padding:8px 0}.rowAction>span{min-width:0}
+.rowAction button.secondary{min-height:38px;padding:0 12px;flex:none}
+.kpiRow.liquidity{margin-bottom:0}.cardLink.flat{margin-top:0;min-height:0}
