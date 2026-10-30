@@ -4,6 +4,7 @@
 }
 
 # CowAgent web console, deployed separately from lrmcorp/lrmagents onto the lnint-edge network.
+# AGENT_DOMAIN is a host list separated by ", ", e.g. lrmcorporation.id, www.lrmcorporation.id.
 {$AGENT_DOMAIN:agent.lnint.xyz} {
   encode zstd gzip
   reverse_proxy cowagent:9899

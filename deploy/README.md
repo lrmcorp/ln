@@ -35,3 +35,5 @@ Jika workflow gagal, lihat langkah yang gagal di GitHub Actions. Bila `sudo -n d
 ## CowAgent di VPS yang sama
 
 Konsol web CowAgent di-deploy dari repo `lrmcorp/lrmagents` ke `~/cowagent`. Caddy di stack ini meneruskan `https://agent.lnint.xyz` ke kontainer `cowagent:9899` melalui jaringan Docker bersama `lnint-edge`. Tambahkan record `A` dengan host `agent` ke `43.152.240.47` di DNSPod. Langkah secret dan variabel GitHub ada di README repo tersebut. Sebelum CowAgent berjalan, subdomain itu mengembalikan 502; `int.lnint.xyz` tidak terpengaruh.
+
+Untuk memindahkan konsol ke `lrmcorporation.id`, buat record `A` untuk `@` dan `www` ke `43.152.240.47` di penyedia DNS domain itu. Lalu buat variabel repo `AGENT_DOMAIN=lrmcorporation.id,www.lrmcorporation.id` di `lrmcorp/ln` dan `lrmcorp/lrmagents`, dan jalankan ulang deploy keduanya. Hapus variabel itu untuk kembali ke `agent.lnint.xyz`.
