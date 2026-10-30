@@ -33,4 +33,15 @@ void main() {
     expect(find.text('Izin berbagi lokasi'), findsOneWidget);
     expect(find.text('Setuju dan lanjutkan'), findsOneWidget);
   });
+
+  testWidgets('a consented device without location permission is asked for it', (tester) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'credentials') return {'server': 'https://contoh.test', 'token': 'token', 'accepted': true};
+      if (call.method == 'permissions') return {'foreground': false, 'background': false, 'notification': false};
+      return null;
+    });
+    await tester.pumpWidget(const LnLokasiApp());
+    await tester.pumpAndSettle();
+    expect(find.text('Izin lokasi perangkat'), findsOneWidget);
+  });
 }

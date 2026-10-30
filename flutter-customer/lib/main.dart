@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:permission_handler/permission_handler.dart';
 
 // Flutter screens for the LN customer location app. Credentials live in the native
 // Keystore-backed store and the foreground location service is the proven native one;
@@ -91,12 +90,16 @@ class _FlowState extends State<Flow> with WidgetsBindingObserver {
     }
   }
 
+  Future<Map<String, dynamic>> _permissions([String method = 'permissions']) async =>
+      Map<String, dynamic>.from(await _native.invokeMethod(method) as Map);
+
   Future<void> _advance() async {
     if (token.isEmpty) return setState(() => stage = Stage.enroll);
     if (!accepted) return setState(() => stage = Stage.consent);
-    if (!(await Permission.locationWhenInUse.isGranted)) return setState(() => stage = Stage.permission);
-    if (!(await Permission.locationAlways.isGranted)) return setState(() => stage = Stage.background);
-    if (await Permission.notification.isDenied) return setState(() => stage = Stage.notice);
+    final granted = await _permissions();
+    if (granted['foreground'] != true) return setState(() => stage = Stage.permission);
+    if (granted['background'] != true) return setState(() => stage = Stage.background);
+    if (granted['notification'] != true) return setState(() => stage = Stage.notice);
     await _start();
   }
 
@@ -171,21 +174,21 @@ class _FlowState extends State<Flow> with WidgetsBindingObserver {
         return _panel('Izin lokasi perangkat',
             'Berikan izin lokasi saat aplikasi digunakan. Setelah itu, aktifkan izin sepanjang waktu agar pelaporan tetap berjalan ketika layar aplikasi ditutup.',
             'Izinkan lokasi', () async {
-          await Permission.locationWhenInUse.request();
+          await _permissions('requestForeground');
           await _advance();
         });
       case Stage.background:
         return _panel('Izin lokasi sepanjang waktu',
             "Di pengaturan Android, pilih izin lokasi 'Izinkan sepanjang waktu', lalu kembali ke aplikasi. Tanpa izin ini, pelaporan latar belakang tidak dimulai.",
             'Buka pengaturan izin', () async {
-          final status = await Permission.locationAlways.request();
-          if (!status.isGranted) await openAppSettings();
+          // Android opens the app settings; returning to the app re-checks via didChangeAppLifecycleState.
+          await _permissions('requestBackground');
           await _advance();
         });
       case Stage.notice:
         return _panel('Pemberitahuan', 'Izinkan pemberitahuan agar Anda selalu melihat saat lokasi sedang dibagikan dan dapat menghentikannya.',
             'Izinkan pemberitahuan', () async {
-          await Permission.notification.request();
+          await _permissions('requestNotification');
           await _start();
         });
       case Stage.inactive:
