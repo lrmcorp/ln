@@ -264,3 +264,37 @@ button:not(.textButton){border-radius:9px;font-size:.9rem}button:disabled{opacit
 .offlineBanner.off{background:var(--warn-soft);color:var(--warn)}
 @media(max-width:960px){.offlineBanner{padding:10px 14px}}
 .profileTop{margin-bottom:24px}
+/* Tagihan, phone-first: one summary card, segmented tabs with counts, one calm empty state, thumb-sized actions */
+.dueSummary{display:grid;gap:14px;margin-bottom:14px;padding:16px}
+.dueStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.dueStats div{background:var(--paper);border-radius:10px;padding:10px 12px;min-width:0}
+.dueStats strong{display:block;font-size:1.45rem;line-height:1.1;font-variant-numeric:tabular-nums}.dueStats small{display:block;color:var(--muted);font-size:.74rem;margin-top:2px}
+.dueStats .alert{background:var(--alert-soft)}.dueStats .alert strong,.dueStats .alert small{color:var(--alert)}
+.dueProgress .lbTop{margin-bottom:6px}.dueProgress .lbTop span{font-size:.84rem;color:var(--muted)}.dueProgress .lbTop span::before{content:none}.dueProgress .meterBar{margin:0}
+.inlineSelect{display:flex;align-items:center;gap:10px;margin:0;font-size:.84rem;color:var(--muted);font-weight:600}.inlineSelect select{flex:1;min-height:42px}
+.segTabs{position:sticky;top:60px;z-index:5;background:var(--paper);margin:0 -2px 12px;padding:6px 2px 8px}
+.segTabs .tab{display:inline-flex;align-items:center;gap:8px}
+.tabCount{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:var(--paper);color:var(--ink);font-size:.74rem;font-variant-numeric:tabular-nums}
+.tab.active .tabCount{background:color-mix(in srgb,var(--surface) 22%,transparent);color:var(--surface)}
+.calmEmpty{display:grid;justify-items:center;gap:6px;text-align:center;padding:36px 16px;color:var(--muted)}.calmEmpty strong{color:var(--ink);font-size:.95rem;font-weight:650}
+.dueCard .caseTop{padding-bottom:10px}
+.dueCard .dueActions{display:grid;gap:8px}.quickActions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.quickActions .pillAction,.payAction{justify-content:center;min-height:46px;border-radius:10px}.payAction{width:100%}
+.pillAction.disabled{opacity:.45;pointer-events:none}
+@media(min-width:700px){.payAction{width:auto;padding:0 22px}}
+@media(max-width:620px){.dueCard .caseTop h3{font-size:1rem}}
+/* empty states read as a quiet line, not a large dashed box */
+.empty{border:0;background:transparent;text-align:center;color:var(--muted);padding:18px 12px;font-size:.9rem}
+.dueCard .dueActions{grid-template-columns:minmax(0,1fr) repeat(3,48px);align-items:center}
+.iconAction{justify-content:center;width:48px;min-height:46px;padding:0!important;border-radius:10px}
+@media(min-width:700px){.dueCard .dueActions{grid-template-columns:auto repeat(3,48px);justify-content:start}}
+.dueCard .caseTop{padding:16px 18px 10px}.dueCard .caseTop p{font-size:.84rem}.dueCard .lastVisit{font-size:.8rem}.dueCard .dueActions{padding:0 18px 16px}
+@media(max-width:620px){.crumbs{display:none}.dueStats small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.payAction{white-space:nowrap}
+@media(max-width:620px){.hideOnPhone{display:none!important}.pageHeader:not(:has(.pageActions>:not(.hideOnPhone))) .pageActions{display:none}}
+@media(max-width:360px){.dueCard .dueActions{grid-template-columns:minmax(0,1fr) repeat(3,42px);gap:6px}.iconAction{width:42px}.payAction{padding:0 10px!important;font-size:.84rem}}
+/* verification cards: approve and reject side by side, the loan link below */
+.case:not(.dueCard) .dueActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start}
+.case:not(.dueCard) .dueActions>button,.case:not(.dueCard) .dueActions>.reasonForm,.case:not(.dueCard) .dueActions>.danger{min-height:46px;width:100%}
+.case:not(.dueCard) .dueActions>.pillAction,.case:not(.dueCard) .dueActions>p,.case:not(.dueCard) .dueActions>.reasonForm{grid-column:1/-1;justify-content:center}
+@media(min-width:700px){.case:not(.dueCard) .dueActions{grid-template-columns:repeat(3,max-content)}.case:not(.dueCard) .dueActions>.pillAction{grid-column:auto}}

@@ -14,7 +14,9 @@ const paths:Record<string,string>={
   logout:'M15 4h4v16h-4M10 17l5-5-5-5M15 12H3',
   menu:'M4 7h16M4 12h16M4 17h16',
   close:'M6 6l12 12M18 6 6 18',
-  plus:'M12 5v14M5 12h14'
+  plus:'M12 5v14M5 12h14',
+  phone:'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z',
+  chat:'M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12zM8.5 12h.01M12 12h.01M15.5 12h.01'
 };
 
 export function Icon({name,size=20}:{name:keyof typeof paths|string;size?:number}){
