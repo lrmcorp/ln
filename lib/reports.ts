@@ -109,8 +109,8 @@ export async function portfolioReport(actor:Actor,filter:ReportFilter={}){
   const dueThisWeek=all.flatMap(loan=>loan.rows.filter(row=>row.dueAt>=start&&row.dueAt<=end)).reduce((s,row)=>s+Number(row.amount),0);
   const ids=all.map(loan=>loan.id);
   const weekly=(await pool.query(`SELECT to_char(date_trunc('week',(p.created_at AT TIME ZONE 'Asia/Jakarta')::date),'YYYY-MM-DD') AS week,SUM(p.amount)::bigint AS total
-    FROM payments p WHERE p.status<>'rejected' AND p.application_id=ANY($1) GROUP BY 1`,[ids])).rows;
-  const thisWeek=(await pool.query(`SELECT p.application_id AS id,SUM(p.amount)::bigint AS paid FROM payments p WHERE p.status<>'rejected' AND p.application_id=ANY($1)
+    FROM payments p WHERE p.status<>'rejected' AND p.method<>'opening' AND p.application_id=ANY($1) GROUP BY 1`,[ids])).rows;
+  const thisWeek=(await pool.query(`SELECT p.application_id AS id,SUM(p.amount)::bigint AS paid FROM payments p WHERE p.status<>'rejected' AND p.method<>'opening' AND p.application_id=ANY($1)
     AND (p.created_at AT TIME ZONE 'Asia/Jakarta')::date BETWEEN $2 AND $3 GROUP BY 1`,[ids,start,end])).rows;
   const paidThisWeek=new Map(thisWeek.map(row=>[row.id as string,Number(row.paid)]));
   const dueOf=(loan:LoanRow)=>loan.rows.filter(row=>row.dueAt>=start&&row.dueAt<=end).reduce((s,row)=>s+Number(row.amount),0);
@@ -145,7 +145,7 @@ export async function portfolioReport(actor:Actor,filter:ReportFilter={}){
     officers.set(loan.collector_id,o);
   }
   const perCollector=(await pool.query(`SELECT COALESCE(a.collector_id,a.officer_id) AS collector,
-      SUM(p.amount) FILTER (WHERE p.status<>'rejected' AND (p.created_at AT TIME ZONE 'Asia/Jakarta')::date BETWEEN $2 AND $3)::bigint AS collected,
+      SUM(p.amount) FILTER (WHERE p.status<>'rejected' AND p.method<>'opening' AND (p.created_at AT TIME ZONE 'Asia/Jakarta')::date BETWEEN $2 AND $3)::bigint AS collected,
       COUNT(*) FILTER (WHERE p.status='pending')::int AS pending
     FROM payments p JOIN applications a ON a.id=p.application_id WHERE p.application_id=ANY($1) GROUP BY 1`,[ids,start,end])).rows;
   for(const row of perCollector){const o=officers.get(row.collector);if(o)o.pending=row.pending;}

@@ -298,3 +298,10 @@ button:not(.textButton){border-radius:9px;font-size:.9rem}button:disabled{opacit
 .case:not(.dueCard) .dueActions>button,.case:not(.dueCard) .dueActions>.reasonForm,.case:not(.dueCard) .dueActions>.danger{min-height:46px;width:100%}
 .case:not(.dueCard) .dueActions>.pillAction,.case:not(.dueCard) .dueActions>p,.case:not(.dueCard) .dueActions>.reasonForm{grid-column:1/-1;justify-content:center}
 @media(min-width:700px){.case:not(.dueCard) .dueActions{grid-template-columns:repeat(3,max-content)}.case:not(.dueCard) .dueActions>.pillAction{grid-column:auto}}
+.manualForm{display:grid;gap:18px;max-width:760px}.manualForm fieldset{border:0;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px}
+.manualForm legend{font-weight:700;font-size:1rem;margin-bottom:10px;padding:0}.manualForm label{margin-bottom:10px}.manualForm>button{justify-self:start;min-width:200px}
+.manualPreview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;background:var(--soft);border-radius:12px;padding:14px}.manualPreview small{display:block;color:var(--muted);font-size:.76rem}.manualPreview strong{font-variant-numeric:tabular-nums}
+@media(max-width:620px){.manualForm fieldset{grid-template-columns:minmax(0,1fr)}.manualForm>button{width:100%}.manualPreview{grid-template-columns:minmax(0,1fr)}}
+.quickPay{display:grid;gap:10px;padding:4px 18px 18px}.quickPay label{margin:0}.quickPayActions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.quickPayActions button{min-height:46px}
+.quickPay input[type=file]{padding:9px;font-size:.84rem}
+.payCard{margin-bottom:16px}.payCard .quickPay{padding:0}

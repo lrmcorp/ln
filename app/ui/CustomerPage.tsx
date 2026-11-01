@@ -1,5 +1,7 @@
 'use client';
-import {PageHeader,Shell,StatusChip,displayName,money,shortDate,type StaffActor} from './Shell';
+import {useState} from 'react';
+import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
+import {QuickPay} from './QuickPay';
 import type {customerProfile} from '@/lib/customers';
 import {whatsappLink} from '@/lib/whatsapp';
 
@@ -14,11 +16,14 @@ export default function CustomerPage({actor,profile}:{actor:StaffActor;profile:P
   const name=displayName(customer.name);
   const active=loans.find(loan=>loan.status==='active');
   const wa=whatsappLink(customer.phone,`Halo ${name}, ini dari LN.`);
+  const action=useAction();
+  const [pay,setPay]=useState(false);
   const completed=loans.filter(loan=>['paid_off','closed'].includes(loan.status)).length;
   return <Shell actor={actor} active="pinjaman">
     <PageHeader title={name} subtitle={<>{customer.branch} · nasabah sejak {shortDate(customer.since)}</>}
       actions={<>{customer.phone&&<a className="button secondary" href={`tel:${customer.phone.replace(/[^\d+]/g,'')}`}>Telepon</a>}{wa&&<a className="button secondary" href={wa} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
-        {active&&<a className="button" href={`/pinjaman#case-${active.id}`}>{actor.role==='owner'?'Buka pinjaman aktif':'Catat bayar'}</a>}</>}/>
+        {active&&<button className="button" aria-expanded={pay} onClick={()=>setPay(!pay)}>Catat bayar</button>}</>}/>
+    {pay&&active&&<section className="card payCard"><div className="cardHead"><h2>Catat bayar</h2></div><QuickPay applicationId={active.id} customer={name} suggested={active.remaining} remaining={active.remaining} role={actor.role} pending={action.pending} run={action.run} onClose={()=>setPay(false)}/></section>}
     <div className="cardGrid profileTop">
       <section className="card"><div className="cardHead"><h2>Kelas nasabah</h2></div>
         <div className="meterTop"><strong>{grade.grade==='Baru'?'Baru':`Kelas ${grade.grade}`}</strong><StatusChip tone={gradeTone[grade.grade]}>{grade.label}</StatusChip></div>
@@ -43,5 +48,6 @@ export default function CustomerPage({actor,profile}:{actor:StaffActor;profile:P
         {actor.role!=='officer'&&<a href={`/api/payments/${p.id}/receipt`} target="_blank" rel="noopener noreferrer">Lihat bukti</a>}</li>)}</ul></div>}</section>
     <section className="register"><div className="sectionHead"><div><h2>Kunjungan</h2></div></div>
       {visits.length===0?<div className="empty">Belum ada kunjungan.</div>:<div className="paymentList"><ul>{visits.map(v=><li key={v.id}><span>{shortDate(v.created_at)} · <strong>{visitLabels[v.outcome]}</strong>{v.promise_date?` ${shortDate(v.promise_date)}`:''} · {displayName(v.officer)}{v.note?` · ${v.note}`:''}</span></li>)}</ul></div>}</section>
+    {action.feedback}
   </Shell>;
 }

@@ -204,6 +204,8 @@ export async function perform(actor:Actor|null, action:Action){
         // Interest is deferred and earned as each installment falls due (lib/accounting.ts runAccruals).
         await journal(c,app.id,'disbursement',d.id,[dr(A.principal,principal),dr(A.interest,interest),cr(A.cash,principal),cr(A.unearned,interest)]);
         await c.query('UPDATE applications SET interest_deferred=true,disbursed_at=now() WHERE id=$1',[app.id]);
+        // Quick loans are created before the transfer; their first installment falls 7 days after the money is sent.
+        if(app.origin==='quick')await c.query(`UPDATE installments SET due_at=(now() AT TIME ZONE 'Asia/Jakarta')::date+7*sequence WHERE application_id=$1`,[app.id]);
         await setStatus(c,actor,app,'active');
         return {id:app.id};
       }

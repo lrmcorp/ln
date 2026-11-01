@@ -17,18 +17,18 @@ type NavGroup={title:string;items:NavItem[]};
 const nav:Record<StaffRole,NavGroup[]>={
   owner:[{title:'Operasional',items:[{key:'beranda',href:'/',label:'Beranda',icon:'home'},{key:'tagihan',href:'/tagihan',label:'Tagihan',icon:'collect',badge:'late'},
       {key:'verifikasi',href:'/verifikasi',label:'Verifikasi',icon:'verify',badge:'verify'},{key:'lokasi',href:'/lokasi',label:'Lokasi nasabah',icon:'location'}]},
-    {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'}]},
+    {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'},{key:'tambah',href:'/pinjaman/tambah',label:'Tambah pinjaman',icon:'plus'}]},
     {title:'Keuangan',items:[{key:'laporan',href:'/laporan',label:'Laporan',icon:'report'},{key:'modal',href:'/modal',label:'Modal & investor',icon:'capital'}]},
     {title:'Pengaturan',items:[{key:'kebijakan',href:'/kebijakan',label:'Kebijakan pinjaman',icon:'policy'},{key:'admin',href:'/admin',label:'Cabang & pengguna',icon:'users'}]}],
   manager:[{title:'Operasional',items:[{key:'beranda',href:'/',label:'Beranda',icon:'home'},{key:'tagihan',href:'/tagihan',label:'Tagihan',icon:'collect',badge:'late'},
       {key:'verifikasi',href:'/verifikasi',label:'Verifikasi',icon:'verify',badge:'verify'},{key:'lokasi',href:'/lokasi',label:'Lokasi nasabah',icon:'location'}]},
-    {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'},{key:'pengajuan',href:'/pengajuan/baru',label:'Pengajuan baru',icon:'intake'}]},
+    {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'},{key:'tambah',href:'/pinjaman/tambah',label:'Tambah pinjaman',icon:'plus'},{key:'pengajuan',href:'/pengajuan/baru',label:'Pengajuan lengkap',icon:'intake'}]},
     {title:'Keuangan',items:[{key:'laporan',href:'/laporan',label:'Laporan',icon:'report'}]}],
   officer:[{title:'Hari ini',items:[{key:'tagihan',href:'/tagihan',label:'Tagihan',icon:'collect',badge:'late'},{key:'setoran',href:'/setoran',label:'Setoran kas',icon:'deposit'}]},
     {title:'Pinjaman',items:[{key:'pinjaman',href:'/pinjaman',label:'Daftar pinjaman',icon:'loans'},{key:'pengajuan',href:'/pengajuan/baru',label:'Pengajuan baru',icon:'intake'}]}]
 };
 const titles:Record<string,string>={beranda:'Beranda',tagihan:'Tagihan',verifikasi:'Verifikasi',lokasi:'Lokasi nasabah',pinjaman:'Daftar pinjaman',laporan:'Laporan',
-  modal:'Modal & investor',kebijakan:'Kebijakan pinjaman',admin:'Cabang & pengguna',setoran:'Setoran kas',pengajuan:'Pengajuan baru'};
+  modal:'Modal & investor',kebijakan:'Kebijakan pinjaman',admin:'Cabang & pengguna',setoran:'Setoran kas',pengajuan:'Pengajuan baru',tambah:'Tambah pinjaman',nasabah:'Nasabah'};
 const shortLabels:Record<string,string>={setoran:'Setoran',pinjaman:'Pinjaman',pengajuan:'Pengajuan'};
 type NavData={badges:{late:number;verify:number};branches:{id:string;name:string}[]};
 

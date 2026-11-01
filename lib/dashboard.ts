@@ -16,7 +16,7 @@ export async function homeDashboard(actor:Actor,filter:ReportFilter={}){
   const {params,where}=scope(actor,filter);
   const daily=(await pool.query(`SELECT to_char((p.created_at AT TIME ZONE 'Asia/Jakarta')::date,'YYYY-MM-DD') AS day,SUM(p.amount)::bigint AS total
       FROM payments p JOIN applications a ON a.id=p.application_id
-      WHERE p.status<>'rejected' AND (p.created_at AT TIME ZONE 'Asia/Jakarta')::date>=$${params.length+1}::date ${where} GROUP BY 1`,[...params,lastMonthStart])).rows;
+      WHERE p.status<>'rejected' AND p.method<>'opening' AND (p.created_at AT TIME ZONE 'Asia/Jakarta')::date>=$${params.length+1}::date ${where} GROUP BY 1`,[...params,lastMonthStart])).rows;
   const byDay=new Map(daily.map(row=>[row.day as string,Number(row.total)]));
   const daysIn=(start:string)=>{const [y,m]=start.split('-').map(Number);return new Date(Date.UTC(y,m,0)).getUTCDate();};
   const series=(start:string,lastDay:number)=>{let sum=0;return Array.from({length:lastDay},(_,i)=>{sum+=byDay.get(addDays(start,i))??0;return sum;});};

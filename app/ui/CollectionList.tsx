@@ -3,6 +3,7 @@ import {useState} from 'react';
 import {PageHeader,Shell,StatusChip,displayName,money,shortDate,useAction,type StaffActor} from './Shell';
 import {whatsappLink} from '@/lib/whatsapp';
 import {Icon} from './icons';
+import {QuickPay} from './QuickPay';
 
 type Item={id:string;customerId:string;promiseBroken:boolean;customerName:string;phone:string|null;collectorName:string|null;remaining:number;fee:number;nextDue:{dueAt:string;amount:number}|null;dpd:number;overdueAmount:number;
   lastVisit:{outcome:string;promiseDate:string|null;note:string|null;at:string}|null;bucket:'late'|'today'|'promise'|'week'|'later'};
@@ -47,13 +48,14 @@ export default function CollectionList({actor,items,week,officers,collectorId,ta
       {t.label}<span className="tabCount">{t.count}</span></button>)}</div>
     {visible.length===0?<div className="calmEmpty"><strong>{tab==='all'?'Tidak ada tagihan dalam 7 hari':sections.find(sec=>sec.bucket===tab)?.empty}</strong>
         {tabs.some(t=>t.key!==tab&&t.key!=='all'&&t.count>0)&&<button className="linkButton" onClick={()=>setTab(tabs.find(t=>t.key!=='all'&&t.count>0)!.key)}>Lihat {tabs.find(t=>t.key!=='all'&&t.count>0)!.label.toLowerCase()}</button>}</div>
-      :<div className="caseList">{visible.map(item=><DueCard key={item.id} item={item} showCollector={actor.role!=='officer'} pending={action.pending} run={action.run}/>)}</div>}
+      :<div className="caseList">{visible.map(item=><DueCard key={item.id} item={item} role={actor.role} showCollector={actor.role!=='officer'} pending={action.pending} run={action.run}/>)}</div>}
     {action.feedback}
   </Shell>;
 }
 
-function DueCard({item,showCollector,pending,run}:{item:Item;showCollector:boolean;pending:boolean;run:ReturnType<typeof useAction>['run']}){
+function DueCard({item,role,showCollector,pending,run}:{item:Item;role:string;showCollector:boolean;pending:boolean;run:ReturnType<typeof useAction>['run']}){
   const [visit,setVisit]=useState(false);
+  const [pay,setPay]=useState(false);
   const [outcome,setOutcome]=useState('not_home');
   const wa=whatsappLink(item.phone,reminder(item));
   const chip=item.promiseBroken?<StatusChip tone="late">Janji bayar {shortDate(item.lastVisit?.promiseDate)} terlewat</StatusChip>:item.dpd>0?<StatusChip tone="late">Terlambat {item.dpd} hari</StatusChip>:item.bucket==='today'?<StatusChip tone="due">Jatuh tempo hari ini</StatusChip>:
@@ -62,10 +64,11 @@ function DueCard({item,showCollector,pending,run}:{item:Item;showCollector:boole
       <p>{item.dpd>0?`Tertunggak ${money(item.overdueAmount)}`:`Angsuran ${money(item.nextDue?.amount)}`} · sisa {money(item.remaining)}{showCollector&&item.collectorName?` · ${displayName(item.collectorName)}`:''}</p>
       {item.lastVisit&&<p className="lastVisit">Kunjungan terakhir {shortDate(item.lastVisit.at)}: {visitLabels[item.lastVisit.outcome]}{item.lastVisit.promiseDate?` ${shortDate(item.lastVisit.promiseDate)}`:''}{item.lastVisit.note?` · ${item.lastVisit.note}`:''}</p>}</div></div>
     <div className="dueActions">
-      <a className="pillAction primary payAction" href={`/pinjaman#case-${item.id}`}>Catat bayar</a>
+      <button className="pillAction primary payAction" aria-expanded={pay} onClick={()=>{setPay(!pay);setVisit(false);}}>Catat bayar</button>
       {item.phone?<a className="pillAction iconAction" href={`tel:${item.phone.replace(/[^\d+]/g,'')}`} aria-label={`Telepon ${displayName(item.customerName)}`} title="Telepon"><Icon name="phone"/></a>:<span className="pillAction iconAction disabled" aria-hidden="true"><Icon name="phone"/></span>}
       {wa?<a className="pillAction iconAction" href={wa} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${displayName(item.customerName)}`} title="WhatsApp"><Icon name="chat"/></a>:<span className="pillAction iconAction disabled" aria-hidden="true"><Icon name="chat"/></span>}
-      <button className="pillAction iconAction" aria-expanded={visit} onClick={()=>setVisit(!visit)} aria-label={`Catat kunjungan ${displayName(item.customerName)}`} title="Catat kunjungan"><Icon name="location"/></button></div>
+      <button className="pillAction iconAction" aria-expanded={visit} onClick={()=>{setVisit(!visit);setPay(false);}} aria-label={`Catat kunjungan ${displayName(item.customerName)}`} title="Catat kunjungan"><Icon name="location"/></button></div>
+    {pay&&<QuickPay applicationId={item.id} customer={displayName(item.customerName)} suggested={item.dpd>0?item.overdueAmount:item.nextDue?.amount??item.remaining} remaining={item.remaining} role={role} pending={pending} run={run} onClose={()=>setPay(false)}/>}
     {visit&&<form className="visitForm" method="post" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);run('/api/ops',{type:'log_visit',applicationId:item.id,outcome,promiseDate:outcome==='promise'?String(f.get('promiseDate')):null,note:String(f.get('note')??'')},{success:'Kunjungan tercatat.',offline:`Kunjungan ${displayName(item.customerName)}`});}}>
       <fieldset className="tenorChoice"><legend>Hasil kunjungan</legend>{Object.entries(visitLabels).map(([key,label])=><label key={key}><input type="radio" name="outcome" value={key} checked={outcome===key} onChange={()=>setOutcome(key)}/><span>{label}</span></label>)}</fieldset>
       {outcome==='promise'&&<label>Tanggal janji bayar<input name="promiseDate" type="date" required/></label>}

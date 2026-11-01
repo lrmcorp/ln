@@ -12,7 +12,7 @@ import {assertExposure} from './exposure';
 
 export type IntakeInput=IdentityDetails&{name:string;phone:string;bankName:string;principal:number;weeks:number;weeklyIncome:number;collectorId?:string|null};
 
-const nikHashOf=(nik:string)=>createHash('sha256').update(`${process.env.SESSION_SECRET}:${nik}`).digest('hex');
+export const nikHashOf=(nik:string)=>createHash('sha256').update(`${process.env.SESSION_SECRET}:${nik}`).digest('hex');
 const sameName=(a:string,b:string)=>a.trim().toLocaleLowerCase('id-ID')===b.trim().toLocaleLowerCase('id-ID');
 
 type Queryable={query:PoolClient['query']};

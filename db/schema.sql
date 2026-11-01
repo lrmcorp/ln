@@ -234,3 +234,14 @@ CREATE TABLE IF NOT EXISTS intake_place (
   photo_cipher bytea, photo_iv bytea, photo_tag bytea, photo_mime text, photo_sha256 text,
   latitude numeric(8,3), longitude numeric(9,3), accuracy_m integer, created_at timestamptz NOT NULL DEFAULT now()
 );
+-- How a loan entered the system: full intake, quick staff entry, or import of a loan that started outside the app.
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'standard';
+-- 'opening' marks what an imported loan had already been paid before it entered the app.
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_method_check;
+ALTER TABLE payments ADD CONSTRAINT payments_method_check CHECK (method IN ('transfer','cash','opening'));
+-- Extra charges added by staff to a running loan (admin fee, manual penalty), paid before interest and principal.
+CREATE TABLE IF NOT EXISTS manual_charges (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL REFERENCES applications(id),
+  kind text NOT NULL, amount bigint NOT NULL CHECK (amount > 0), reason text NOT NULL,
+  created_by uuid NOT NULL REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now()
+);
