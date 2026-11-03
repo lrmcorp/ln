@@ -11,6 +11,10 @@
   handle /whatsapp* {
     reverse_proxy whatsapp-gateway:8080
   }
+  # Coding teammates (Codex, Claude Code, Gemini, Grok, DeepSeek): page, API and sign-in terminals.
+  handle /teammates* {
+    reverse_proxy teammates:8090
+  }
   handle {
     reverse_proxy cowagent:9899
   }
